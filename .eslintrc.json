@@ -1,0 +1,58 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@/lib/supabase/admin",
+            "message": "createAdminClient bypasses RLS with the service_role key. Import it only from lib/actions/**, lib/audit.ts, app/api/**, or scripts — prefer createClient() from @/lib/supabase/server in anything else."
+          },
+          {
+            "name": "@supabase/supabase-js",
+            "importNames": ["createClient"],
+            "message": "Never build a Supabase client directly. Use createClient() (lib/supabase/server.ts or client.ts) or createAdminClient() (lib/supabase/admin.ts)."
+          },
+          {
+            "name": "@supabase/ssr",
+            "importNames": ["createServerClient", "createBrowserClient"],
+            "message": "Never build a Supabase client directly. Use createClient() (lib/supabase/server.ts or client.ts) or createAdminClient() (lib/supabase/admin.ts)."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["lib/actions/**/*.ts", "lib/actions/**/*.tsx", "app/api/**/*.ts", "lib/audit.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@supabase/supabase-js",
+                "importNames": ["createClient"],
+                "message": "Use createAdminClient() / createClient() from lib/supabase/*."
+              },
+              {
+                "name": "@supabase/ssr",
+                "importNames": ["createServerClient", "createBrowserClient"],
+                "message": "Use createAdminClient() / createClient() from lib/supabase/*."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["lib/supabase/**/*.ts", "lib/supabase/**/*.tsx", "middleware.ts"],
+      "rules": { "no-restricted-imports": "off" }
+    },
+    {
+      "files": ["scripts/**/*.ts"],
+      "rules": { "no-restricted-imports": "off" }
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+node_modules/
+.next/
+deployments/
+.env.local
+*.env
+notes-delivery-plan.md

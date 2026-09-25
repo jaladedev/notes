@@ -1,0 +1,562 @@
+@import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&family=Baloo+2:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background-color: #fbf9f4;
+  color: #1f2a44;
+}
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Baloo 2", system-ui, sans-serif;
+}
+
+/* Visible keyboard focus everywhere — accessibility floor */
+:focus-visible {
+  outline: 2px solid #f2b705;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Prose content rendered from topic_notes.content (markdown) */
+.topic-prose h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2a44;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 2px solid #f2b705;
+  display: inline-block;
+  padding-bottom: 2px;
+}
+
+.topic-prose p {
+  line-height: 1.7;
+  margin-bottom: 0.75rem;
+  color: #1f2a44;
+}
+
+.topic-prose ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.topic-prose ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.topic-prose li {
+  margin-bottom: 0.25rem;
+}
+
+/* The actual horizontal-scroll container for wide tables. Rendered as a
+   real wrapping div (see the ReactMarkdown `table` component override in
+   TopicContent/NoteSlideView) rather than `table { display: block;
+   overflow-x: auto }` -- that CSS-only hack doesn't reliably contain the
+   scroll, since a table uses its own layout algorithm and its intrinsic
+   width can leak past the box into the page, causing the *whole page*
+   to scroll horizontally instead of just the table. */
+.topic-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+  border: 1px solid #d9d3c4;
+  scrollbar-width: thin;
+  scrollbar-color: #d9d3c4 transparent;
+}
+
+/* Thin, always-visible scrollbar (rather than the browser's default
+   chunky one, or an invisible overlay scrollbar on touch devices) so
+   it's obvious at a glance that there's more to see sideways. */
+.topic-table-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.topic-table-scroll::-webkit-scrollbar-thumb {
+  background-color: #d9d3c4;
+  border-radius: 3px;
+}
+
+.topic-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+/* The TipTap Table extension (resizable: true) renders its own
+   `.tableWrapper` div around the live, editable table -- a separate
+   element from `.topic-table-scroll` above, which only wraps the
+   read-only react-markdown output. Same reasoning applies here: contain
+   the scroll on this wrapper, not on the `<table>` itself. */
+.topic-prose .tableWrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+  border: 1px solid #d9d3c4;
+  scrollbar-width: thin;
+  scrollbar-color: #d9d3c4 transparent;
+}
+.topic-prose .tableWrapper::-webkit-scrollbar {
+  height: 6px;
+}
+.topic-prose .tableWrapper::-webkit-scrollbar-thumb {
+  background-color: #d9d3c4;
+  border-radius: 3px;
+}
+.topic-prose .tableWrapper table {
+  margin: 0;
+  border: none;
+}
+
+/* Column widths shrink-to-fit by default, which on a table like a
+   "Life Process / Living Thing Example / Description" summary table
+   squeezes every column down and wraps every cell instead of ever
+   triggering the table's own overflow-x: auto -- there's technically no
+   overflow to scroll, so readers just get cramped, heavily wrapped text
+   with no way to see more. Forcing a sensible floor per cell means the
+   table reliably overflows (and scrolls) on a narrow screen instead of
+   silently squishing. */
+.topic-prose td,
+.topic-prose th {
+  min-width: 8rem;
+}
+
+.topic-prose th {
+  background-color: #e4f0e9;
+  color: #2f6b4f;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d9d3c4;
+  position: relative;
+}
+
+.topic-prose td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d9d3c4;
+  position: relative;
+}
+
+/* prosemirror-tables ships zero default styling of its own for these --
+   without this, a multi-cell drag-selection (the thing you're looking at
+   right before hitting Merge/Delete row/col) gives no visual feedback at
+   all, and the resize handle either doesn't render or renders as an
+   unstyled sliver. Only relevant in the editor (.ProseMirror), not the
+   published read-only view, since neither exists there. */
+.topic-prose .ProseMirror td.selectedCell::after,
+.topic-prose .ProseMirror th.selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(58, 125, 68, 0.15); /* leaf, at low opacity */
+  pointer-events: none;
+}
+.topic-prose .ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  z-index: 20;
+  background-color: #3a7d44; /* leaf */
+  opacity: 0;
+  transition: opacity 120ms ease;
+  pointer-events: none;
+}
+.topic-prose .ProseMirror td:hover > .column-resize-handle,
+.topic-prose .ProseMirror th:hover > .column-resize-handle,
+.topic-prose .ProseMirror .column-resize-handle.dragging {
+  opacity: 1;
+}
+.topic-prose .ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+/* Row/column hover cue -- a light tint on whichever cell the pointer is
+   over, so it's clear what "add row above" etc. in the table popover
+   would apply to before you click. Purely a while-typing affordance;
+   :hover already no-ops in the read-only view. */
+.topic-prose .ProseMirror table td:hover,
+.topic-prose .ProseMirror table th:hover {
+  background-color: rgba(58, 125, 68, 0.06);
+}
+
+/* Keep dense admin/report tables usable on phones instead of forcing
+   columns to collapse into unreadable widths. Their wrappers provide the
+   horizontal scroll; this retains natural table sizing inside them. */
+@media (max-width: 640px) {
+  table {
+    min-width: max-content;
+  }
+}
+
+.topic-prose strong {
+  color: #1f2a44;
+}
+
+/* TipTap ships with zero default styling for its contentEditable div --
+   unlike the wrapper's `p-4`, this is about the editor's own inner
+   surface. Without an explicit min-height/padding here the first block's
+   top margin collapses through the wrapper padding (a normal CSS
+   margin-collapse, not a TipTap bug), and the caret can sit visually
+   flush against the left edge because `.ProseMirror` itself has no
+   inline padding of its own -- it was only ever inheriting the
+   wrapper's. Give the editable surface explicit breathing room instead
+   of relying on the wrapper alone. */
+.topic-prose .ProseMirror {
+  padding: 0.25rem 0.5rem;
+  outline: none;
+  min-height: inherit;
+}
+
+.topic-prose .ProseMirror > *:first-child {
+  margin-top: 0;
+}
+
+.topic-prose .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: #9c9384;
+}
+
+/* Checklists (@tiptap/extension-task-list) render as a <ul data-type
+   ="taskList">, which would otherwise inherit the disc bullet + 1.25rem
+   indent from the plain `.topic-prose ul` rule above. Task items need
+   their own layout: no bullet, checkbox + content side by side, and
+   nested checklists indented under their parent item rather than the
+   list's own padding. */
+.topic-prose ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.topic-prose ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.topic-prose ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+  user-select: none;
+}
+
+.topic-prose ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+}
+
+.topic-prose ul[data-type="taskList"] ul[data-type="taskList"] {
+  margin-left: 1.25rem;
+}
+
+.topic-prose li[data-checked="true"] > div > p {
+  color: #9c9384;
+  text-decoration: line-through;
+}
+
+/* Highlight (@tiptap/extension-highlight) renders a <mark> -- give it an
+   explicit background so it isn't left to browser UA defaults, and so
+   multicolor highlights (inline style="background-color") aren't
+   overridden by anything more specific here. */
+.topic-prose mark {
+  background-color: #fef08a;
+  border-radius: 2px;
+  padding: 0 0.1em;
+}
+
+/* Code blocks: matches the editor's CodeBlockLowlight node view
+   (lib/tiptap/code-block.tsx) 1:1 -- same background, radius, and
+   padding -- so a published note's code blocks look identical to what
+   the teacher saw while writing it, instead of falling back to the
+   browser's plain monospace-on-white default. rehype-highlight (wired
+   in TopicContent.tsx / NoteSlideView.tsx) adds the `hljs` + per-token
+   classes; the github-dark theme stylesheet imported alongside it
+   supplies the token colors, this block supplies the surrounding chrome. */
+.topic-prose pre {
+  background-color: #0d1117;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.topic-prose pre code.hljs {
+  background: transparent;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1.625;
+}
+/* Inline `code` (not inside a pre) keeps a lighter, in-line-with-text
+   treatment -- the dark card styling above is only for fenced blocks. */
+.topic-prose :not(pre) > code {
+  background-color: #f1f5f9;
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  font-size: 0.875em;
+}
+
+@media print {
+  /* ── Page setup ─────────────────────────────────────────────────── */
+  @page {
+    margin: 18mm 15mm;
+    size: A4;
+  }
+
+  body {
+    background: white;
+    color: #000;
+    font-size: 11pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── App chrome — hide everything except the handout card ───────── */
+
+  /* Sidebar nav rendered by the dashboard layout */
+  nav,
+  aside,
+  header,
+  [data-sidebar],
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Page-level chrome marked print:hidden in page.tsx /
+     NoteWorkspace mode pill */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* ── Handout card — remove screen-only decoration ───────────────── */
+  .rounded-2xl.border.border-rule.bg-white {
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Typography ─────────────────────────────────────────────────── */
+  .topic-prose h1 {
+    font-size: 18pt;
+    margin-top: 16pt;
+  }
+  .topic-prose h2 {
+    font-size: 15pt;
+    margin-top: 14pt;
+  }
+  .topic-prose h3 {
+    font-size: 13pt;
+    margin-top: 12pt;
+  }
+  .topic-prose h4 {
+    font-size: 11pt;
+    margin-top: 10pt;
+  }
+  .topic-prose p,
+  .topic-prose li {
+    line-height: 1.55;
+  }
+
+  /* ── Page breaks ─────────────────────────────────────────────────── */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+  figure, table, pre, blockquote,
+  /* Callout cards, resource embeds */
+  .callout, [data-callout], [data-resource] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* Section nodes — prefer a break before a new major heading section
+     rather than mid-paragraph, but don't force it */
+  .note-section {
+    break-before: auto;
+  }
+
+  /* ── Tables ──────────────────────────────────────────────────────── */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 10pt;
+  }
+  th,
+  td {
+    border: 1px solid #aaa;
+    padding: 4pt 6pt;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #f0f0f0 !important;
+    font-weight: 600;
+  }
+
+  /* ── Code blocks ─────────────────────────────────────────────────── */
+  pre,
+  code {
+    font-size: 9pt;
+    white-space: pre-wrap;
+    word-break: break-word;
+    border: 1px solid #ddd;
+    border-radius: 3pt;
+  }
+  pre {
+    padding: 6pt 8pt;
+    background: #f8f8f8 !important;
+  }
+
+  /* ── Callout blocks (:::tip / :::warning etc.) ────────────────────── */
+  /* TopicContent (student/handout view) renders :::type fences as plain
+     paragraphs — no special treatment needed. The [data-callout] rule
+     below targets the editor-only TipTap node view which is never visible
+     in handout mode, but is included defensively. */
+  [data-callout] {
+    border-left: 3pt solid #aaa;
+    padding: 6pt 10pt;
+    margin: 8pt 0;
+    background: #f9f9f9 !important;
+  }
+
+  /* ── Math (KaTeX already renders as HTML — just ensure colour) ─── */
+  .katex {
+    color: #000 !important;
+  }
+
+  /* ── Mermaid diagrams — SVG already in DOM, just ensure sizing ─── */
+  .mermaid svg,
+  [data-mermaid] svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* ── Resource embeds ─────────────────────────────────────────────── */
+  /* Images: cap width, centre them */
+  .topic-prose img {
+    max-width: 100% !important;
+    height: auto;
+    display: block;
+    margin: 6pt auto;
+  }
+
+  /* Video / audio iframes: replace with a note (can't print video) */
+  iframe,
+  video,
+  audio {
+    display: none !important;
+  }
+
+  /* ── Assessment & topic link chips ───────────────────────────────── */
+  /* These render as card-style bordered links in the browser.
+     In print, flatten them to a simple inline reference label. */
+  .topic-prose a.rounded-xl {
+    display: inline !important;
+    border: none !important;
+    padding: 0 !important;
+    background: none !important;
+    color: #000 !important;
+    gap: 0 !important;
+  }
+  /* Hide the decorative emoji icon, keep the text spans */
+  .topic-prose a.rounded-xl > span[aria-hidden] {
+    display: none !important;
+  }
+  .topic-prose a.rounded-xl .text-sm {
+    display: inline !important;
+    font-weight: 600;
+  }
+  .topic-prose a.rounded-xl .text-xs {
+    display: inline !important;
+    font-weight: normal;
+    color: #555 !important;
+  }
+  .topic-prose a.rounded-xl .text-xs::before {
+    content: " (";
+  }
+  .topic-prose a.rounded-xl .text-xs::after {
+    content: ")";
+  }
+
+  /* ── Resource chip (non-image) — show as italicised label ────────── */
+  [data-resource-id]:not(img) {
+    font-style: italic;
+    color: #555 !important;
+  }
+}
+
+/* Note editor accessibility controls (#37 in markdown-editor-todo.md) --
+   toggled via the "Aa" menu in NoteEditor.tsx, applied as classes/a CSS
+   var on the `.topic-prose` note container so they only affect note
+   content, not the rest of the app chrome. */
+
+/* Font size: a CSS var read by .topic-prose's own font-size, rather than
+   a fixed class-per-size, so it composes cleanly with everything else
+   that already sets font-size deeper in the tree (headings, code, etc.)
+   -- those stay relative (em/rem) and scale off this base automatically. */
+.topic-prose {
+  font-size: var(--note-font-size, 1rem);
+}
+
+/* High contrast: strengthens borders/text color beyond the normal
+   ink/ink-soft palette rather than introducing a whole separate color
+   scheme -- the goal is more contrast against the existing design, not
+   a different one. */
+.topic-prose.a11y-high-contrast {
+  color: #000;
+}
+.topic-prose.a11y-high-contrast.border,
+.topic-prose.a11y-high-contrast .border,
+.topic-prose.a11y-high-contrast .border-rule {
+  border-color: #000 !important;
+}
+.topic-prose.a11y-high-contrast a {
+  color: #0000ee;
+  text-decoration: underline;
+}
+.topic-prose.a11y-high-contrast .text-ink-soft {
+  color: #1a1a1a !important;
+}
+
+/* Dyslexia-friendly font: Atkinson Hyperlegible */
+.topic-prose.a11y-dyslexia-font,
+.topic-prose.a11y-dyslexia-font * {
+  font-family:
+    "OpenDyslexic", "Atkinson Hyperlegible", "Comic Sans MS", "Comic Sans", sans-serif !important;
+}
