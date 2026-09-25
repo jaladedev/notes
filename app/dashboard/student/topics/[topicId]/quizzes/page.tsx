@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function StudentQuizzesPage({
   params,
@@ -15,7 +16,11 @@ export default async function StudentQuizzesPage({
   const supabase = createClient();
   const { id: studentId } = await requireUser();
 
-  const { data: topic } = await supabase.from("topics").select("id, title").eq("id", topicId).single();
+  const { data: topic } = await supabase
+    .from("topics")
+    .select("id, title, space_id, spaces(name)")
+    .eq("id", topicId)
+    .single();
   if (!topic) notFound();
 
   const { data: quizzes } = await supabase
@@ -39,9 +44,14 @@ export default async function StudentQuizzesPage({
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4 sm:p-6">
       <div>
-        <Link href={`/dashboard/student/topics/${topicId}`} className="text-sm text-ink-soft hover:text-ink">
-          ← {topic.title}
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: "Spaces", href: "/dashboard/student" },
+            { label: (topic as any).spaces?.name ?? "Space", href: `/dashboard/student/spaces/${topic.space_id}` },
+            { label: topic.title, href: `/dashboard/student/topics/${topicId}` },
+            { label: "Quizzes" },
+          ]}
+        />
         <h1 className="font-display text-xl font-semibold text-ink">Quizzes</h1>
       </div>
 

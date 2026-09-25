@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { assertSpaceRole } from "@/lib/actions/authGuards";
 import { SpaceSettingsPanel } from "@/components/admin/SpaceSettingsPanel";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function AdminSpacePage({
   params,
@@ -39,6 +40,7 @@ export default async function AdminSpacePage({
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
+      <Breadcrumbs items={[{ label: "Spaces", href: "/dashboard/admin/spaces" }, { label: space.name }]} />
       <h1 className="mb-4 font-display text-xl font-semibold text-ink">{space.name}</h1>
       <SpaceSettingsPanel
         spaceId={spaceId}

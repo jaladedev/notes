@@ -10,6 +10,7 @@ import { NoteVersionDiff } from "@/components/NoteVersionDiff";
 import { RestoreVersionButton } from "@/components/RestoreVersionButton";
 import { DeleteVersionButton } from "@/components/DeleteVersionButton";
 import { ShareLinkManager } from "@/components/ShareLinkManager";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import type { LinkableTopic } from "@/lib/tiptap/topic-link-node";
 import { getSchoolTimeZone, getTimetable } from "@/lib/actions/timetable";
 import { nowInZone, toBellEntries } from "@/lib/timetable";
@@ -76,6 +77,13 @@ export default async function TeacherNotePage({
 
   return (
     <div className="mx-auto max-w-5xl p-4 sm:p-6">
+      <Breadcrumbs
+        items={[
+          { label: "Spaces", href: "/dashboard/teacher" },
+          { label: (topic as any).spaces?.name ?? "Space", href: `/dashboard/teacher/spaces/${topic.space_id}` },
+          { label: topic.title },
+        ]}
+      />
       <h1 className="mb-4 font-display text-xl font-semibold text-ink">{topic.title}</h1>
       <NoteWorkspace
         topicId={topicId}

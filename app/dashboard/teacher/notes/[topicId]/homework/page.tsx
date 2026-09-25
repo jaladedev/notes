@@ -2,11 +2,11 @@
 // student's submission, and grade it inline.
 
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { assertSpaceRole } from "@/lib/actions/authGuards";
 import { CreateHomeworkForm } from "@/components/homework/CreateHomeworkForm";
 import { GradeSubmissionForm } from "@/components/homework/GradeSubmissionForm";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function TeacherHomeworkPage({
   params,
@@ -18,7 +18,7 @@ export default async function TeacherHomeworkPage({
 
   const { data: topic } = await supabase
     .from("topics")
-    .select("id, title, space_id")
+    .select("id, title, space_id, spaces(name)")
     .eq("id", topicId)
     .single();
   if (!topic) notFound();
@@ -50,9 +50,14 @@ export default async function TeacherHomeworkPage({
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
       <div>
-        <Link href={`/dashboard/teacher/notes/${topicId}`} className="text-sm text-ink-soft hover:text-ink">
-          ← {topic.title}
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: "Spaces", href: "/dashboard/teacher" },
+            { label: (topic as any).spaces?.name ?? "Space", href: `/dashboard/teacher/spaces/${topic.space_id}` },
+            { label: topic.title, href: `/dashboard/teacher/notes/${topicId}` },
+            { label: "Homework" },
+          ]}
+        />
         <h1 className="font-display text-xl font-semibold text-ink">Homework</h1>
       </div>
 

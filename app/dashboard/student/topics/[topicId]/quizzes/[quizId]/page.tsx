@@ -3,15 +3,23 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { startQuizAttempt } from "@/lib/actions/quizAttempt";
 import { QuizAttemptRunner } from "@/components/quizzes/QuizAttemptRunner";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function StudentQuizAttemptPage({
   params,
 }: {
   params: Promise<{ topicId: string; quizId: string }>;
 }) {
-  const { quizId } = await params;
+  const { topicId, quizId } = await params;
   const supabase = createClient();
   const { id: studentId } = await requireUser();
+
+  const { data: topic } = await supabase
+    .from("topics")
+    .select("id, title, space_id, spaces(name)")
+    .eq("id", topicId)
+    .single();
+  if (!topic) notFound();
 
   const { data: quiz } = await supabase
     .from("quizzes")
@@ -54,6 +62,15 @@ export default async function StudentQuizAttemptPage({
   if (attempt.submitted_at) {
     return (
       <div className="mx-auto max-w-2xl p-4 sm:p-6">
+        <Breadcrumbs
+          items={[
+            { label: "Spaces", href: "/dashboard/student" },
+            { label: (topic as any).spaces?.name ?? "Space", href: `/dashboard/student/spaces/${topic.space_id}` },
+            { label: topic.title, href: `/dashboard/student/topics/${topicId}` },
+            { label: "Quizzes", href: `/dashboard/student/topics/${topicId}/quizzes` },
+            { label: quiz.title },
+          ]}
+        />
         <h1 className="mb-4 font-display text-xl font-semibold text-ink">{quiz.title}</h1>
         <div className="rounded-xl border border-leaf bg-leaf-soft p-6 text-center">
           <p className="font-display text-2xl font-semibold text-ink">
@@ -67,6 +84,15 @@ export default async function StudentQuizAttemptPage({
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
+      <Breadcrumbs
+        items={[
+          { label: "Spaces", href: "/dashboard/student" },
+          { label: (topic as any).spaces?.name ?? "Space", href: `/dashboard/student/spaces/${topic.space_id}` },
+          { label: topic.title, href: `/dashboard/student/topics/${topicId}` },
+          { label: "Quizzes", href: `/dashboard/student/topics/${topicId}/quizzes` },
+          { label: quiz.title },
+        ]}
+      />
       <h1 className="mb-4 font-display text-xl font-semibold text-ink">{quiz.title}</h1>
       <QuizAttemptRunner
         attemptId={attempt.id}

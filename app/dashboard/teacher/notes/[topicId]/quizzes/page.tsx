@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { assertSpaceRole } from "@/lib/actions/authGuards";
 import { CreateQuizForm } from "@/components/quizzes/CreateQuizForm";
 import { PublishQuizToggle } from "@/components/quizzes/PublishQuizToggle";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function TeacherQuizzesPage({
   params,
@@ -15,7 +15,7 @@ export default async function TeacherQuizzesPage({
 
   const { data: topic } = await supabase
     .from("topics")
-    .select("id, title, space_id")
+    .select("id, title, space_id, spaces(name)")
     .eq("id", topicId)
     .single();
   if (!topic) notFound();
@@ -31,9 +31,14 @@ export default async function TeacherQuizzesPage({
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
       <div>
-        <Link href={`/dashboard/teacher/notes/${topicId}`} className="text-sm text-ink-soft hover:text-ink">
-          ← {topic.title}
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: "Spaces", href: "/dashboard/teacher" },
+            { label: (topic as any).spaces?.name ?? "Space", href: `/dashboard/teacher/spaces/${topic.space_id}` },
+            { label: topic.title, href: `/dashboard/teacher/notes/${topicId}` },
+            { label: "Quizzes" },
+          ]}
+        />
         <h1 className="font-display text-xl font-semibold text-ink">Quizzes</h1>
       </div>
 

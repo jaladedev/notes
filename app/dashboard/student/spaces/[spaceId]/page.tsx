@@ -15,6 +15,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function StudentSpacePage({
   params,
@@ -54,6 +55,7 @@ export default async function StudentSpacePage({
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
+      <Breadcrumbs items={[{ label: "Spaces", href: "/dashboard/student" }, { label: space.name }]} />
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-display text-xl font-semibold text-ink">{space.name}</h1>
         <Link href="/dashboard/timetable" className="text-sm text-ink underline">

@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { TopicContent } from "@/components/TopicContent";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function StudentTopicPage({
   params,
@@ -16,7 +17,11 @@ export default async function StudentTopicPage({
   const supabase = createClient();
   const { id: studentId } = await requireUser();
 
-  const { data: topic } = await supabase.from("topics").select("id, title").eq("id", topicId).single();
+  const { data: topic } = await supabase
+    .from("topics")
+    .select("id, title, space_id, spaces(name)")
+    .eq("id", topicId)
+    .single();
   if (!topic) notFound();
 
   // RLS (topic_note_visible) already enforces release_at/moderation/membership --
@@ -49,6 +54,13 @@ export default async function StudentTopicPage({
 
   return (
     <div className="mx-auto max-w-3xl p-4 sm:p-6">
+      <Breadcrumbs
+        items={[
+          { label: "Spaces", href: "/dashboard/student" },
+          { label: (topic as any).spaces?.name ?? "Space", href: `/dashboard/student/spaces/${topic.space_id}` },
+          { label: topic.title },
+        ]}
+      />
       <h1 className="mb-4 font-display text-xl font-semibold text-ink">{topic.title}</h1>
       <div className="mb-4 flex gap-2">
         <a
