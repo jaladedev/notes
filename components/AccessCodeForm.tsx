@@ -18,6 +18,7 @@ export function AccessCodeForm() {
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder="Access code"
+        title="Enter the access code shared with you to view this note"
         className="mb-3 w-full rounded-lg border border-rule bg-white px-3 py-2 text-center text-sm"
       />
       <button

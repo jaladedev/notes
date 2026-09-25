@@ -139,6 +139,7 @@ export function ResourceSidebar({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={isUploading}
+          title="Upload a resource file for this topic"
           className="rounded-lg border border-leaf px-2 py-1 text-xs font-medium text-leaf hover:bg-leaf-soft disabled:opacity-60"
         >
           {isUploading ? "Uploading…" : "Choose file"}

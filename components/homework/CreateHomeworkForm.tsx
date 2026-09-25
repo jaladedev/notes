@@ -40,12 +40,14 @@ export function CreateHomeworkForm({ topicId }: { topicId: string }) {
         type="text"
         required
         placeholder="Title"
+        title="Homework title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
       />
       <textarea
         placeholder="Instructions (optional)"
+        title="Instructions for students"
         value={instructions}
         onChange={(e) => setInstructions(e.target.value)}
         rows={3}
@@ -57,6 +59,7 @@ export function CreateHomeworkForm({ topicId }: { topicId: string }) {
           type="datetime-local"
           value={dueAt}
           onChange={(e) => setDueAt(e.target.value)}
+          title="Due date and time (optional)"
           className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
         />
       </div>

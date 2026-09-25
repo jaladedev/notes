@@ -67,6 +67,8 @@ export default function ChangePasswordPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-lg border border-rule px-3 py-2 text-ink"
+              placeholder="At least 8 characters"
+              title="Choose a new password, at least 8 characters"
             />
           </div>
           <div>
@@ -81,6 +83,8 @@ export default function ChangePasswordPage() {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               className="w-full rounded-lg border border-rule px-3 py-2 text-ink"
+              placeholder="Re-enter your new password"
+              title="Re-enter the same new password to confirm"
             />
           </div>
 

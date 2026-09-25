@@ -75,6 +75,7 @@ export function ShareLinkManager({ topicId, links }: { topicId: string; links: S
               <button
                 type="button"
                 onClick={() => copyLink(link.token)}
+                title="Copy this share link to your clipboard"
                 className="text-xs font-medium text-leaf hover:underline"
               >
                 Copy
@@ -83,6 +84,7 @@ export function ShareLinkManager({ topicId, links }: { topicId: string; links: S
                 type="button"
                 disabled={isPending}
                 onClick={() => handleRevoke(link.id)}
+                title="Revoke this share link — it will stop working immediately"
                 className="text-xs font-medium text-clay hover:underline disabled:opacity-50"
               >
                 Revoke
@@ -98,11 +100,13 @@ export function ShareLinkManager({ topicId, links }: { topicId: string; links: S
           value={accessCode}
           onChange={(e) => setAccessCode(e.target.value)}
           placeholder="Optional access code"
+          title="Optional code viewers must enter to open this link"
           className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm"
         />
         <button
           type="submit"
           disabled={isPending}
+          title="Create a new share link"
           className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
         >
           Create link

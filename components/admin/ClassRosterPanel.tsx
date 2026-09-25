@@ -52,6 +52,7 @@ export function ClassRosterPanel({ classId, members }: { classId: string; member
               type="button"
               disabled={isPending}
               onClick={() => handleRemove(m.profile_id)}
+              title={`Remove ${m.profiles?.full_name ?? "this student"} from the class`}
               className="text-xs font-medium text-clay hover:underline disabled:opacity-50"
             >
               Remove
@@ -66,6 +67,7 @@ export function ClassRosterPanel({ classId, members }: { classId: string; member
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="student@example.com"
+          title="Email of the existing student account to add to this class"
           className="flex-1 rounded-lg border border-rule bg-white px-3 py-2 text-sm"
         />
         <button

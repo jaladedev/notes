@@ -50,6 +50,7 @@ export function CreateStudentForm({ classes }: { classes: { id: string; name: st
         type="text"
         required
         placeholder="Full name"
+        title="Student's full name"
         value={fullName}
         onChange={(e) => setFullName(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
@@ -58,6 +59,7 @@ export function CreateStudentForm({ classes }: { classes: { id: string; name: st
         type="email"
         required
         placeholder="Email"
+        title="Student's email address (used to sign in)"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
@@ -66,6 +68,7 @@ export function CreateStudentForm({ classes }: { classes: { id: string; name: st
         <select
           value={classId}
           onChange={(e) => setClassId(e.target.value)}
+          title="Class to enroll this student in"
           className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
         >
           <option value="">No class yet</option>

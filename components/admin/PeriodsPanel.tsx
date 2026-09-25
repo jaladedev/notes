@@ -72,7 +72,7 @@ export function PeriodsPanel({ periods, timeZone }: { periods: Period[]; timeZon
               </span>
             </span>
             <span className="flex gap-3">
-              <button type="button" onClick={() => edit(p)} className="text-xs font-medium text-ink hover:underline">
+              <button type="button" onClick={() => edit(p)} title="Edit this period" className="text-xs font-medium text-ink hover:underline">
                 Edit
               </button>
               <button
@@ -81,6 +81,7 @@ export function PeriodsPanel({ periods, timeZone }: { periods: Period[]; timeZon
                 onClick={() =>
                   run(() => deleteTimetablePeriod(p.period_number), "Period removed.", "Couldn't remove that period.")
                 }
+                title="Remove this period"
                 className="text-xs font-medium text-clay hover:underline disabled:opacity-50"
               >
                 Remove
@@ -101,6 +102,7 @@ export function PeriodsPanel({ periods, timeZone }: { periods: Period[]; timeZon
             min={1}
             value={number}
             onChange={(e) => setNumber(Number(e.target.value))}
+            title="Period number, used to order the bell schedule"
             className="mt-0.5 block w-16 rounded-md border border-rule bg-white px-2 py-1 text-sm text-ink"
           />
         </label>
@@ -110,6 +112,7 @@ export function PeriodsPanel({ periods, timeZone }: { periods: Period[]; timeZon
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="Optional"
+            title="Optional display name for this period, e.g. Assembly"
             className="mt-0.5 block w-28 rounded-md border border-rule bg-white px-2 py-1 text-sm text-ink"
           />
         </label>
@@ -119,6 +122,7 @@ export function PeriodsPanel({ periods, timeZone }: { periods: Period[]; timeZon
             type="time"
             value={start}
             onChange={(e) => setStart(e.target.value)}
+            title="When this period starts"
             className="mt-0.5 block rounded-md border border-rule bg-white px-2 py-1 text-sm text-ink"
           />
         </label>
@@ -128,11 +132,12 @@ export function PeriodsPanel({ periods, timeZone }: { periods: Period[]; timeZon
             type="time"
             value={end}
             onChange={(e) => setEnd(e.target.value)}
+            title="When this period ends"
             className="mt-0.5 block rounded-md border border-rule bg-white px-2 py-1 text-sm text-ink"
           />
         </label>
         <label className="flex items-center gap-1 pb-1 text-xs text-ink-soft">
-          <input type="checkbox" checked={isBreak} onChange={(e) => setIsBreak(e.target.checked)} />
+          <input type="checkbox" checked={isBreak} onChange={(e) => setIsBreak(e.target.checked)} title="Mark as a break — no lesson can be scheduled here" />
           Break
         </label>
         <button
@@ -156,6 +161,8 @@ export function PeriodsPanel({ periods, timeZone }: { periods: Period[]; timeZon
           <input
             value={zone}
             onChange={(e) => setZone(e.target.value)}
+            placeholder="Africa/Lagos"
+            title="IANA time zone name, e.g. Africa/Lagos"
             className="mt-0.5 block w-48 rounded-md border border-rule bg-white px-2 py-1 text-sm text-ink"
           />
         </label>

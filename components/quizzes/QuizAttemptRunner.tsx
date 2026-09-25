@@ -84,6 +84,7 @@ export function QuizAttemptRunner({
                   name={q.id}
                   checked={answers[q.id] === o.id}
                   onChange={() => selectAnswer(q.id, o.id)}
+                  title={`Select "${o.label}" as your answer`}
                 />
                 {o.label}
               </label>
@@ -95,6 +96,7 @@ export function QuizAttemptRunner({
         type="button"
         disabled={isPending}
         onClick={handleSubmit}
+        title="Submit your quiz answers"
         className="rounded-lg bg-marigold px-4 py-2 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
       >
         {isPending ? "Submitting…" : "Submit quiz"}

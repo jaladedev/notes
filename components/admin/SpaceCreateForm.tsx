@@ -56,6 +56,7 @@ export function SpaceCreateForm({ subjects }: { subjects: SubjectOption[] }) {
           type="checkbox"
           checked={useCurriculum}
           onChange={(e) => setUseCurriculum(e.target.checked)}
+          title="Tie this space to the subject/level/term grid instead of a free-typed name"
         />
         Tie this space to a subject, level, and term (school_app-style)
       </label>
@@ -65,6 +66,7 @@ export function SpaceCreateForm({ subjects }: { subjects: SubjectOption[] }) {
           <select
             value={subjectId}
             onChange={(e) => setSubjectId(e.target.value)}
+            title="Subject for this space"
             className="rounded-lg border border-rule bg-white px-2 py-2 text-sm"
           >
             <option value="">New subject…</option>
@@ -79,12 +81,14 @@ export function SpaceCreateForm({ subjects }: { subjects: SubjectOption[] }) {
               value={newSubjectName}
               onChange={(e) => setNewSubjectName(e.target.value)}
               placeholder="Subject name, e.g. Basic Science"
+              title="Name for the new subject"
               className="flex-1 rounded-lg border border-rule bg-white px-3 py-2 text-sm"
             />
           )}
           <select
             value={educationLevel}
             onChange={(e) => setEducationLevel(e.target.value as EducationLevel)}
+            title="Education level for this space"
             className="rounded-lg border border-rule bg-white px-2 py-2 text-sm"
           >
             <option value="primary">Primary</option>
@@ -104,11 +108,13 @@ export function SpaceCreateForm({ subjects }: { subjects: SubjectOption[] }) {
             value={academicYear}
             onChange={(e) => setAcademicYear(e.target.value)}
             placeholder="2026/2027"
+            title="Academic year, e.g. 2026/2027"
             className="w-28 rounded-lg border border-rule bg-white px-2 py-2 text-sm"
           />
           <select
             value={term}
             onChange={(e) => setTerm(Number(e.target.value) as 1 | 2 | 3)}
+            title="Term this space covers"
             className="rounded-lg border border-rule bg-white px-2 py-2 text-sm"
           >
             <option value={1}>Term 1</option>
@@ -122,6 +128,7 @@ export function SpaceCreateForm({ subjects }: { subjects: SubjectOption[] }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. JSS2 Basic Science"
+          title="Space name"
           className="w-full rounded-lg border border-rule bg-white px-3 py-2 text-sm outline-none focus-visible:border-marigold"
         />
       )}

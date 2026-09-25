@@ -40,6 +40,7 @@ export function CreateAnnouncementForm({
         type="text"
         required
         placeholder="Title"
+        title="Announcement title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
@@ -47,6 +48,7 @@ export function CreateAnnouncementForm({
       <textarea
         required
         placeholder="What's this about?"
+        title="Announcement body"
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={3}
@@ -56,6 +58,7 @@ export function CreateAnnouncementForm({
         <select
           value={spaceId}
           onChange={(e) => setSpaceId(e.target.value)}
+          title="Who this announcement targets"
           className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
         >
           {isAdmin && <option value="">School-wide</option>}

@@ -43,6 +43,7 @@ export function GradeSubmissionForm({
         type="number"
         step="0.1"
         placeholder="Grade"
+        title="Numeric grade for this submission"
         value={grade}
         onChange={(e) => setGrade(e.target.value)}
         className="w-20 rounded-lg border border-rule px-2 py-1 text-sm text-ink"
@@ -50,6 +51,7 @@ export function GradeSubmissionForm({
       <input
         type="text"
         placeholder="Feedback (optional)"
+        title="Feedback for the student"
         value={feedback}
         onChange={(e) => setFeedback(e.target.value)}
         className="min-w-0 flex-1 rounded-lg border border-rule px-2 py-1 text-sm text-ink"

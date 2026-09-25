@@ -865,6 +865,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                             value={topicFilter}
                             onChange={(e) => setTopicFilter(e.target.value)}
                             placeholder="Filter by title…"
+                            title="Filter the topic list by title"
                             className="w-full rounded-md border border-rule px-2 py-1 text-sm outline-none focus-visible:border-marigold"
                           />
                         </div>
@@ -1002,6 +1003,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                     }
                   }}
                   placeholder="Find"
+                  title="Text to find in the note"
                   className="min-w-40 flex-1 rounded-md border border-rule bg-white px-2.5 py-1.5 text-sm text-ink outline-none focus-visible:border-marigold"
                 />
                 <span className="min-w-16 text-center text-xs text-ink-soft" aria-live="polite">
@@ -1013,6 +1015,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                   type="button"
                   onClick={() => selectSearchMatch(-1)}
                   disabled={searchMatches.length === 0}
+                  title="Previous match"
                   className="rounded-md border border-rule bg-white px-2.5 py-1.5 text-sm text-ink hover:bg-white/70 disabled:opacity-40"
                 >
                   Previous
@@ -1021,6 +1024,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                   type="button"
                   onClick={() => selectSearchMatch(1)}
                   disabled={searchMatches.length === 0}
+                  title="Next match"
                   className="rounded-md border border-rule bg-white px-2.5 py-1.5 text-sm text-ink hover:bg-white/70 disabled:opacity-40"
                 >
                   Next
@@ -1030,6 +1034,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                     type="checkbox"
                     checked={matchCase}
                     onChange={(e) => setMatchCase(e.target.checked)}
+                    title="Match case when finding text"
                     className="accent-marigold"
                   />
                   Match case
@@ -1037,6 +1042,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                 <button
                   type="button"
                   onClick={() => setSearchOpen(false)}
+                  title="Close find and replace"
                   className="ml-auto rounded-md px-2 py-1.5 text-xs text-ink-soft hover:bg-white hover:text-ink"
                 >
                   Close
@@ -1058,6 +1064,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
                     }
                   }}
                   placeholder="Replace with"
+                  title="Text to replace matches with"
                   className="min-w-40 flex-1 rounded-md border border-rule bg-white px-2.5 py-1.5 text-sm text-ink outline-none focus-visible:border-marigold"
                 />
                 <button

@@ -96,6 +96,7 @@ export function CreateQuizForm({ topicId }: { topicId: string }) {
         type="text"
         required
         placeholder="Quiz title"
+        title="Quiz title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
@@ -104,6 +105,7 @@ export function CreateQuizForm({ topicId }: { topicId: string }) {
         type="number"
         min={1}
         placeholder="Time limit in minutes (optional)"
+        title="Time limit in minutes (optional)"
         value={timeLimit}
         onChange={(e) => setTimeLimit(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"

@@ -35,11 +35,13 @@ export function ClassCreateForm() {
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="e.g. JSS2A"
+        title="Class name, e.g. JSS2A"
         className="flex-1 rounded-lg border border-rule bg-white px-3 py-2 text-sm"
       />
       <select
         value={educationLevel}
         onChange={(e) => setEducationLevel(e.target.value as EducationLevel | "")}
+        title="Education level this class belongs to"
         className="rounded-lg border border-rule bg-white px-2 py-2 text-sm"
       >
         <option value="">Level (optional)</option>
@@ -54,6 +56,7 @@ export function ClassCreateForm() {
         value={levelNumber}
         onChange={(e) => setLevelNumber(e.target.value)}
         placeholder="#"
+        title="Grade number within the level, e.g. 2 for JSS2"
         className="w-16 rounded-lg border border-rule bg-white px-2 py-2 text-sm"
       />
       <button

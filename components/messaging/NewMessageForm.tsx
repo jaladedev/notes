@@ -36,6 +36,7 @@ export function NewMessageForm() {
       <input
         type="text"
         placeholder="Search by name…"
+        title="Search for someone to message"
         value={query}
         onFocus={() => handleSearch(query)}
         onChange={(e) => handleSearch(e.target.value)}
@@ -49,6 +50,7 @@ export function NewMessageForm() {
                 type="button"
                 disabled={isPending}
                 onClick={() => startConversation(r.id)}
+                title={`Start a conversation with ${r.full_name}`}
                 className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-ink hover:bg-paper disabled:opacity-60"
               >
                 {r.full_name}

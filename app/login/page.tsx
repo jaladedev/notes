@@ -63,6 +63,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-lg border border-rule bg-white px-3 py-2 text-ink outline-none focus-visible:border-marigold"
               placeholder="you@example.com"
+              title="Enter the email address for your account"
             />
           </div>
 
@@ -78,6 +79,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-lg border border-rule bg-white px-3 py-2 text-ink outline-none focus-visible:border-marigold"
               placeholder="••••••••"
+              title="Enter your account password"
             />
           </div>
 

@@ -536,6 +536,7 @@ export function NoteToolbar({
                 checked={highContrast}
                 onChange={(e) => setHighContrast(e.target.checked)}
                 aria-label="High contrast note text"
+                title="High contrast note text"
               />
             </label>
             <label className="mb-2 flex items-center justify-between gap-2">
@@ -545,6 +546,7 @@ export function NoteToolbar({
                 checked={dyslexiaFont}
                 onChange={(e) => setDyslexiaFont(e.target.checked)}
                 aria-label="Use dyslexia-friendly font"
+                title="Use dyslexia-friendly font"
               />
             </label>
             <label className="flex items-center justify-between gap-2">
@@ -554,6 +556,7 @@ export function NoteToolbar({
                 checked={spellcheckEnabled}
                 onChange={(e) => setSpellcheckEnabled(e.target.checked)}
                 aria-label="Underline misspelled words as you type"
+                title="Underline misspelled words as you type"
               />
             </label>
             <p className="mt-2 text-xs text-ink-soft">

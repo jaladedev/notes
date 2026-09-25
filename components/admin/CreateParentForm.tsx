@@ -57,6 +57,7 @@ export function CreateParentForm({ students }: { students: { id: string; full_na
         type="text"
         required
         placeholder="Full name"
+        title="Parent's full name"
         value={fullName}
         onChange={(e) => setFullName(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
@@ -65,6 +66,7 @@ export function CreateParentForm({ students }: { students: { id: string; full_na
         type="email"
         required
         placeholder="Email"
+        title="Parent's email address (used to sign in)"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
@@ -79,6 +81,7 @@ export function CreateParentForm({ students }: { students: { id: string; full_na
                   type="checkbox"
                   checked={childIds.includes(s.id)}
                   onChange={() => toggleChild(s.id)}
+                  title={`Link ${s.full_name} as this parent's child`}
                 />
                 {s.full_name}
               </label>

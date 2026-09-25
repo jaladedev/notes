@@ -92,6 +92,7 @@ export function SpaceSettingsPanel({
           <select
             value={classId}
             onChange={(e) => setClassId(e.target.value)}
+            title="Class whose roster can read this space"
             className="flex-1 rounded-lg border border-rule bg-white px-3 py-2 text-sm"
           >
             <option value="">No class linked</option>
@@ -123,11 +124,13 @@ export function SpaceSettingsPanel({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
+            title="Space name"
             className="flex-1 rounded-lg border border-rule bg-white px-3 py-2 text-sm"
           />
           <button
             type="submit"
             disabled={isPending}
+            title="Save the new space name"
             className="rounded-lg border border-rule px-3 py-2 text-sm hover:bg-paper disabled:opacity-60"
           >
             Save
@@ -136,6 +139,7 @@ export function SpaceSettingsPanel({
         <button
           type="button"
           disabled={isPending}
+          title="Permanently delete this space and everything in it"
           onClick={() => {
             if (!confirm(`Delete "${spaceName}"? This deletes every topic and note in it.`)) return;
             run(async () => {
@@ -165,6 +169,7 @@ export function SpaceSettingsPanel({
                 type="button"
                 disabled={isPending}
                 onClick={() => run(() => removeSpaceMember(spaceId, m.profile_id), "Couldn't remove that member.")}
+                title={`Remove ${m.profiles?.full_name ?? "this member"} from the space`}
                 className="text-xs font-medium text-clay hover:underline disabled:opacity-50"
               >
                 Remove
@@ -187,11 +192,13 @@ export function SpaceSettingsPanel({
             value={memberEmail}
             onChange={(e) => setMemberEmail(e.target.value)}
             placeholder="colleague@example.com"
+            title="Email of the existing account to add"
             className="flex-1 rounded-lg border border-rule bg-white px-3 py-2 text-sm"
           />
           <select
             value={memberRole}
             onChange={(e) => setMemberRole(e.target.value as typeof memberRole)}
+            title="Role to grant this member in the space"
             className="rounded-lg border border-rule bg-white px-2 py-2 text-sm"
           >
             <option value="teacher">Teacher</option>
@@ -239,6 +246,7 @@ export function SpaceSettingsPanel({
             value={newTopicTitle}
             onChange={(e) => setNewTopicTitle(e.target.value)}
             placeholder="New topic title"
+            title="Title for the new topic"
             className="flex-1 rounded-lg border border-rule bg-white px-3 py-2 text-sm"
           />
           <input

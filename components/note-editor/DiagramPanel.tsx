@@ -54,7 +54,7 @@ export const DiagramPanel = forwardRef<HTMLElement, DiagramPanelProps>(function 
     <section ref={ref} className="mb-4 rounded-xl border border-rule bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-display text-sm font-semibold text-ink">Generate Mermaid diagram</h3>
-        <button type="button" onClick={onClose} className="text-xs text-ink-soft hover:underline">
+        <button type="button" onClick={onClose} title="Close this panel" className="text-xs text-ink-soft hover:underline">
           Close
         </button>
       </div>
@@ -63,6 +63,7 @@ export const DiagramPanel = forwardRef<HTMLElement, DiagramPanelProps>(function 
         value={diagramTitle}
         onChange={(e) => onDiagramTitleChange(e.target.value)}
         placeholder="Diagram title (optional)"
+        title="Display title for this diagram"
         className="mb-2 w-full rounded-lg border border-rule bg-white p-2 text-sm text-ink outline-none focus-visible:border-marigold"
       />
       <div className="mb-3">
@@ -75,6 +76,7 @@ export const DiagramPanel = forwardRef<HTMLElement, DiagramPanelProps>(function 
               key={template.label}
               type="button"
               onClick={() => onDiagramCodeChange(template.code)}
+              title={`Start from the ${template.label} template`}
               className="rounded-full border border-rule px-2.5 py-1 text-xs text-ink hover:border-marigold hover:bg-paper"
             >
               {template.label}
@@ -91,6 +93,7 @@ export const DiagramPanel = forwardRef<HTMLElement, DiagramPanelProps>(function 
             value={diagramCode}
             onChange={(e) => onDiagramCodeChange(e.target.value)}
             rows={10}
+            title="Mermaid diagram syntax"
             className="w-full rounded-lg border border-rule bg-white p-3 font-mono text-sm text-ink outline-none focus-visible:border-marigold"
           />
         </div>
@@ -106,6 +109,7 @@ export const DiagramPanel = forwardRef<HTMLElement, DiagramPanelProps>(function 
           type="button"
           onClick={onSave}
           disabled={isSaving}
+          title="Insert this diagram into the note"
           className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
         >
           {isSaving ? "Saving…" : "Insert diagram into note"}

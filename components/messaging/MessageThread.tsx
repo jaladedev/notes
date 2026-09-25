@@ -98,11 +98,13 @@ export function MessageThread({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Write a message…"
+          title="Type a message to send"
           className="flex-1 rounded-lg border border-rule px-3 py-2 text-sm text-ink"
         />
         <button
           type="submit"
           disabled={isPending || !body.trim()}
+          title="Send this message"
           className="rounded-lg bg-marigold px-4 py-2 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
         >
           Send

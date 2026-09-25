@@ -21,7 +21,7 @@ export function VideoEmbedPopover({
     <section className="mb-4 rounded-xl border border-rule bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-display text-sm font-semibold text-ink">Embed video</h3>
-        <button type="button" onClick={onClose} className="text-xs text-ink-soft hover:underline">
+        <button type="button" onClick={onClose} title="Close this panel" className="text-xs text-ink-soft hover:underline">
           Close
         </button>
       </div>
@@ -33,6 +33,7 @@ export function VideoEmbedPopover({
         value={videoUrl}
         onChange={(e) => onVideoUrlChange(e.target.value)}
         placeholder="https://www.youtube.com/watch?v=…"
+        title="YouTube or Vimeo video URL"
         type="url"
         className="mb-2 w-full rounded-lg border border-rule p-2 text-sm outline-none focus-visible:border-marigold"
       />
@@ -40,6 +41,7 @@ export function VideoEmbedPopover({
         value={videoTitle}
         onChange={(e) => onVideoTitleChange(e.target.value)}
         placeholder="Video title (optional)"
+        title="Display title for the embedded video"
         className="w-full rounded-lg border border-rule p-2 text-sm outline-none focus-visible:border-marigold"
       />
       <div className="mt-3 flex justify-end">
@@ -47,6 +49,7 @@ export function VideoEmbedPopover({
           type="button"
           onClick={onInsert}
           disabled={isSaving}
+          title="Insert this video into the note"
           className="rounded-lg bg-marigold px-3 py-1.5 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
         >
           {isSaving ? "Embedding…" : "Insert video"}

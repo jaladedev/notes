@@ -45,6 +45,7 @@ export function CreateTeacherForm() {
         type="text"
         required
         placeholder="Full name"
+        title="Teacher's full name"
         value={fullName}
         onChange={(e) => setFullName(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
@@ -53,6 +54,7 @@ export function CreateTeacherForm() {
         type="email"
         required
         placeholder="Email"
+        title="Teacher's email address (used to sign in)"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"

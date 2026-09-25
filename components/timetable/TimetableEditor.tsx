@@ -99,7 +99,7 @@ export function TimetableEditor({
   return (
     <div className="space-y-4">
       <label className="flex items-center gap-2 text-sm text-ink">
-        <input type="checkbox" checked={showSaturday} onChange={(e) => setShowSaturday(e.target.checked)} />
+        <input type="checkbox" checked={showSaturday} onChange={(e) => setShowSaturday(e.target.checked)} title="Show Saturday in the timetable grid" />
         Show Saturday
       </label>
 
@@ -132,6 +132,7 @@ export function TimetableEditor({
                   value={spaceId}
                   onChange={(e) => chooseSpace(e.target.value)}
                   required
+                  title="Subject/space taught in this lesson"
                   className="mt-1 block rounded-lg border border-rule bg-white px-3 py-2 text-sm"
                 >
                   <option value="">Choose a space</option>
@@ -149,6 +150,7 @@ export function TimetableEditor({
                   value={teacherId}
                   onChange={(e) => setTeacherId(e.target.value)}
                   disabled={!chosenSpace}
+                  title="Teacher for this lesson"
                   className="mt-1 block rounded-lg border border-rule bg-white px-3 py-2 text-sm disabled:opacity-60"
                 >
                   <option value="">No teacher</option>
@@ -167,6 +169,7 @@ export function TimetableEditor({
                   onChange={(e) => setRoom(e.target.value)}
                   maxLength={40}
                   placeholder="Optional"
+                  title="Room for this lesson (optional, not clash-checked)"
                   className="mt-1 block w-32 rounded-lg border border-rule bg-white px-3 py-2 text-sm"
                 />
               </label>
