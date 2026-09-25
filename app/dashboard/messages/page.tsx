@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/actions/authGuards";
 import { listMyConversations } from "@/lib/actions/messaging";
 import { NewMessageForm } from "@/components/messaging/NewMessageForm";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function MessagesPage() {
   await requireUser();
@@ -9,6 +10,7 @@ export default async function MessagesPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Messages" }]} />
       <h1 className="font-display text-xl font-semibold text-ink">Messages</h1>
 
       <NewMessageForm />

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { getSchoolTimeZone, getTimetable } from "@/lib/actions/timetable";
 import { PeriodsPanel } from "@/components/admin/PeriodsPanel";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function AdminTimetablePage() {
   await assertGlobalRole(["admin"], "Only an admin can manage the timetable.");
@@ -25,6 +26,7 @@ export default async function AdminTimetablePage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Timetable" }]} />
       <h1 className="font-display text-xl font-semibold text-ink">Timetable</h1>
 
       <PeriodsPanel periods={periods} timeZone={timeZone} />

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { CreateTeacherForm } from "@/components/admin/CreateTeacherForm";
 import { AccountActions } from "@/components/admin/AccountActions";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function AdminStaffPage() {
   await assertGlobalRole(["admin"], "Only an admin can manage staff accounts.");
@@ -20,6 +21,7 @@ export default async function AdminStaffPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Staff" }]} />
       <h1 className="font-display text-xl font-semibold text-ink">Staff</h1>
 
       <CreateTeacherForm />

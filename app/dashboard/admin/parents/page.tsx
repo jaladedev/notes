@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { CreateParentForm } from "@/components/admin/CreateParentForm";
 import { AccountActions } from "@/components/admin/AccountActions";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function AdminParentsPage() {
   await assertGlobalRole(["admin"], "Only an admin can manage parent accounts.");
@@ -21,6 +22,7 @@ export default async function AdminParentsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Parents" }]} />
       <h1 className="font-display text-xl font-semibold text-ink">Parents</h1>
 
       <CreateParentForm students={students ?? []} />

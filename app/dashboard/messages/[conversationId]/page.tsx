@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { getConversationParticipantNames } from "@/lib/actions/messaging";
 import { MessageThread } from "@/components/messaging/MessageThread";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function ConversationPage({
   params,
@@ -32,6 +33,16 @@ export default async function ConversationPage({
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
+      <Breadcrumbs
+        items={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Messages", href: "/dashboard/messages" },
+          {
+            label:
+              participantNames[Object.keys(participantNames).find((id) => id !== userId) ?? ""] ?? "Conversation",
+          },
+        ]}
+      />
       <h1 className="mb-4 font-display text-xl font-semibold text-ink">
         {participantNames[Object.keys(participantNames).find((id) => id !== userId) ?? ""] ?? "Conversation"}
       </h1>

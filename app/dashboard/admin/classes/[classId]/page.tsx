@@ -8,6 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { ClassRosterPanel } from "@/components/admin/ClassRosterPanel";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function AdminClassPage({
   params,
@@ -33,6 +34,13 @@ export default async function AdminClassPage({
 
   return (
     <div className="mx-auto max-w-lg space-y-6 p-4 sm:p-6">
+      <Breadcrumbs
+        items={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Classes", href: "/dashboard/admin/classes" },
+          { label: klass.name },
+        ]}
+      />
       <h1 className="font-display text-xl font-semibold text-ink">{klass.name}</h1>
 
       <ClassRosterPanel classId={classId} members={(members ?? []) as any} />

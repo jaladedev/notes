@@ -8,6 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { SpaceCreateForm } from "@/components/admin/SpaceCreateForm";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function AdminSpacesPage() {
   const { id: userId } = await requireUser();
@@ -23,6 +24,7 @@ export default async function AdminSpacesPage() {
 
   return (
     <div className="mx-auto max-w-lg p-4 sm:p-6">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Spaces" }]} />
       <h1 className="mb-4 font-display text-xl font-semibold text-ink">Spaces you administer</h1>
 
       <ul className="mb-6 space-y-2">

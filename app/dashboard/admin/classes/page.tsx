@@ -7,6 +7,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { ClassCreateForm } from "@/components/admin/ClassCreateForm";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function AdminClassesPage() {
   await requireUser();
@@ -19,6 +20,7 @@ export default async function AdminClassesPage() {
 
   return (
     <div className="mx-auto max-w-lg p-4 sm:p-6">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Classes" }]} />
       <h1 className="mb-4 font-display text-xl font-semibold text-ink">Classes</h1>
       <p className="mb-4 text-sm text-ink-soft">
         A class has its own student roster. Tie a space to a class (from that space&apos;s settings)

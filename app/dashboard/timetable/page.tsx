@@ -4,12 +4,12 @@
 // Teachers see just their own week (one grid, class in each cell);
 // students and parents see one grid per class.
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { getTimetable } from "@/lib/actions/timetable";
 import { TimetableGridView } from "@/components/timetable/TimetableGridView";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import type { TimetableRow } from "@/lib/timetable";
 
 export default async function TimetablePage() {
@@ -25,15 +25,13 @@ export default async function TimetablePage() {
   if (rows.length === 0) {
     return (
       <div className="mx-auto max-w-md p-8 text-center">
+        <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Timetable" }]} />
         <h1 className="mb-2 font-display text-xl font-semibold text-ink">Timetable</h1>
         <p className="text-sm text-ink-soft">
           {isTeacher
             ? "No lessons are assigned to you yet. An admin sets the timetable."
             : "The timetable for your class hasn't been set up yet."}
         </p>
-        <Link href="/dashboard" className="mt-4 inline-block text-sm text-ink underline">
-          Back to your spaces
-        </Link>
       </div>
     );
   }
@@ -47,6 +45,7 @@ export default async function TimetablePage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+      <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Timetable" }]} />
       {isTeacher ? (
         <>
           <h1 className="font-display text-xl font-semibold text-ink">My week</h1>
