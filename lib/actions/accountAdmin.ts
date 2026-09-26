@@ -196,6 +196,59 @@ export async function createParentAccount(input: {
   return { userId, temporaryPassword };
 }
 
+export type BulkImportRowResult = { row: number; email: string; ok: boolean; message: string };
+
+/**
+ * Creates one account per row, reusing createStudentAccount so audit
+ * logging, temp passwords, and email-uniqueness checks all stay
+ * consistent with the single-account path. Never throws for a bad row
+ * -- one malformed line in a 200-row CSV shouldn't lose the other 199,
+ * so failures are collected and returned instead.
+ */
+export async function bulkCreateStudents(
+  rows: { fullName: string; email: string; className?: string }[]
+): Promise<BulkImportRowResult[]> {
+  await assertGlobalRole(["admin"], "Only an admin can create accounts.");
+  const admin = createAdminClient();
+
+  const { data: classes } = await admin.from("classes").select("id, name");
+  const classIdByName = new Map((classes ?? []).map((c) => [c.name.trim().toLowerCase(), c.id]));
+
+  const results: BulkImportRowResult[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const rowNumber = i + 2; // +1 for header, +1 for 1-indexing
+    if (!r.fullName || !r.email) {
+      results.push({ row: rowNumber, email: r.email || "(missing)", ok: false, message: "Missing name or email." });
+      continue;
+    }
+    const classId = r.className ? classIdByName.get(r.className.trim().toLowerCase()) : undefined;
+    if (r.className && !classId) {
+      results.push({
+        row: rowNumber,
+        email: r.email,
+        ok: false,
+        message: `No class named "${r.className}" -- create it first.`,
+      });
+      continue;
+    }
+    try {
+      await createStudentAccount({ fullName: r.fullName, email: r.email, classId });
+      results.push({ row: rowNumber, email: r.email, ok: true, message: "Created." });
+    } catch (err) {
+      results.push({
+        row: rowNumber,
+        email: r.email,
+        ok: false,
+        message: err instanceof Error ? err.message : "Failed to create.",
+      });
+    }
+  }
+
+  revalidatePath("/dashboard/admin/students");
+  return results;
+}
+
 export async function resetUserPassword(userId: string): Promise<{ password: string }> {
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can reset a password.");
   const admin = createAdminClient();

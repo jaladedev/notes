@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { CreateAnnouncementForm } from "@/components/announcements/CreateAnnouncementForm";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { markAllAnnouncementsRead } from "@/lib/actions/notifications";
 
 export default async function AnnouncementsPage() {
   const { id: userId } = await requireUser();
@@ -28,6 +29,8 @@ export default async function AnnouncementsPage() {
     .select("id, title, body, created_at, spaces(name), classes(name)")
     .order("created_at", { ascending: false })
     .limit(50);
+
+  await markAllAnnouncementsRead();
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">

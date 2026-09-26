@@ -20,10 +20,15 @@ export default async function MessagesPage() {
           <li key={c.id}>
             <Link
               href={`/dashboard/messages/${c.id}`}
-              className="block rounded-lg border border-rule bg-white p-3 hover:border-marigold"
+              className="flex items-center justify-between gap-2 rounded-lg border border-rule bg-white p-3 hover:border-marigold"
             >
-              <p className="text-sm font-medium text-ink">{c.otherName}</p>
-              {c.last && <p className="truncate text-xs text-ink-soft">{c.last.body}</p>}
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-ink">{c.otherName}</p>
+                {c.last && <p className="truncate text-xs text-ink-soft">{c.last.body}</p>}
+              </div>
+              {c.unread && (
+                <span className="h-2 w-2 shrink-0 rounded-full bg-marigold" title="Unread messages" />
+              )}
             </Link>
           </li>
         ))}

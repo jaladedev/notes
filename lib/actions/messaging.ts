@@ -48,6 +48,53 @@ export async function sendMessage(conversationId: string, body: string) {
     .from("messages")
     .insert({ conversation_id: conversationId, sender_id: userId, body });
   if (error) throwDbError(error);
+  // Sending counts as having read the conversation up to now.
+  await supabase
+    .from("conversation_members")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .eq("profile_id", userId);
+}
+
+/** Marks a conversation as read up to now for the current user. */
+export async function markConversationRead(conversationId: string) {
+  const { id: userId } = await requireUser();
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("conversation_members")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .eq("profile_id", userId);
+  if (error) throwDbError(error);
+}
+
+/** Total number of conversations with at least one message from someone else after the caller last read it. */
+export async function getUnreadMessageCount(): Promise<number> {
+  const { id: userId } = await requireUser();
+  const supabase = createClient();
+
+  const { data: memberships } = await supabase
+    .from("conversation_members")
+    .select("conversation_id, last_read_at")
+    .eq("profile_id", userId);
+  if (!memberships || memberships.length === 0) return 0;
+
+  const conversationIds = memberships.map((m) => m.conversation_id);
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("conversation_id, sender_id, created_at")
+    .in("conversation_id", conversationIds)
+    .neq("sender_id", userId);
+
+  const lastReadByConversation = new Map(memberships.map((m) => [m.conversation_id, m.last_read_at]));
+  const unreadConversations = new Set<string>();
+  for (const m of messages ?? []) {
+    const lastRead = lastReadByConversation.get(m.conversation_id);
+    if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
+      unreadConversations.add(m.conversation_id);
+    }
+  }
+  return unreadConversations.size;
 }
 
 /**
@@ -128,10 +175,11 @@ export async function listMyConversations() {
 
   const { data: myConversations } = await supabase
     .from("conversation_members")
-    .select("conversation_id")
+    .select("conversation_id, last_read_at")
     .eq("profile_id", userId);
   const conversationIds = (myConversations ?? []).map((c) => c.conversation_id);
   if (conversationIds.length === 0) return [];
+  const lastReadByConversation = new Map(myConversations!.map((c) => [c.conversation_id, c.last_read_at]));
 
   const admin = createAdminClient();
   const { data: allMembers } = await admin
@@ -141,11 +189,11 @@ export async function listMyConversations() {
 
   const { data: lastMessages } = await supabase
     .from("messages")
-    .select("conversation_id, body, created_at")
+    .select("conversation_id, sender_id, body, created_at")
     .in("conversation_id", conversationIds)
     .order("created_at", { ascending: false });
 
-  const lastByConversation = new Map<string, { body: string; created_at: string }>();
+  const lastByConversation = new Map<string, { sender_id: string; body: string; created_at: string }>();
   for (const m of lastMessages ?? []) {
     if (!lastByConversation.has(m.conversation_id)) lastByConversation.set(m.conversation_id, m);
   }
@@ -158,10 +206,16 @@ export async function listMyConversations() {
   }
 
   return conversationIds
-    .map((id) => ({
-      id,
-      otherName: otherByConversation.get(id) ?? "Someone",
-      last: lastByConversation.get(id) ?? null,
-    }))
+    .map((id) => {
+      const last = lastByConversation.get(id) ?? null;
+      const lastRead = lastReadByConversation.get(id);
+      const unread = !!last && last.sender_id !== userId && (!lastRead || new Date(last.created_at) > new Date(lastRead));
+      return {
+        id,
+        otherName: otherByConversation.get(id) ?? "Someone",
+        last,
+        unread,
+      };
+    })
     .sort((a, b) => (b.last?.created_at ?? "").localeCompare(a.last?.created_at ?? ""));
 }

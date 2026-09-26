@@ -7,6 +7,7 @@ import { assertSpaceRole } from "@/lib/actions/authGuards";
 import { CreateHomeworkForm } from "@/components/homework/CreateHomeworkForm";
 import { GradeSubmissionForm } from "@/components/homework/GradeSubmissionForm";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { getDueStatus, DUE_STATUS_STYLES, DUE_STATUS_LABELS } from "@/lib/dueStatus";
 
 export default async function TeacherHomeworkPage({
   params,
@@ -66,20 +67,30 @@ export default async function TeacherHomeworkPage({
       <div className="space-y-4">
         {(assignments ?? []).map((hw) => {
           const subs = byHomework.get(hw.id) ?? [];
+          const status = getDueStatus(hw.due_at, false);
+          const ungraded = subs.filter((s: any) => s.grade == null).length;
           return (
             <div key={hw.id} className="rounded-xl border border-rule bg-white p-4">
-              <div className="mb-1 flex items-center justify-between">
+              <div className="mb-1 flex items-center justify-between gap-2">
                 <h3 className="font-display text-sm font-semibold text-ink">{hw.title}</h3>
-                {hw.due_at && (
-                  <span className="text-xs text-ink-soft">
-                    Due {new Date(hw.due_at).toLocaleString()}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {status !== "none" && (
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${DUE_STATUS_STYLES[status]}`}>
+                      {DUE_STATUS_LABELS[status]}
+                    </span>
+                  )}
+                  {hw.due_at && (
+                    <span className="text-xs text-ink-soft">
+                      Due {new Date(hw.due_at).toLocaleString()}
+                    </span>
+                  )}
+                </div>
               </div>
               {hw.instructions && <p className="mb-3 text-sm text-ink-soft">{hw.instructions}</p>}
 
               <p className="mb-2 text-xs uppercase tracking-wide text-ink-soft">
                 {subs.length} submission{subs.length === 1 ? "" : "s"}
+                {ungraded > 0 && <span className="text-clay"> · {ungraded} ungraded</span>}
               </p>
               <div className="space-y-3">
                 {subs.map((s: any) => (

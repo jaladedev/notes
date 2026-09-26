@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
-import { getConversationParticipantNames } from "@/lib/actions/messaging";
+import { getConversationParticipantNames, markConversationRead } from "@/lib/actions/messaging";
 import { MessageThread } from "@/components/messaging/MessageThread";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
@@ -30,6 +30,7 @@ export default async function ConversationPage({
     .order("created_at", { ascending: true });
 
   const participantNames = await getConversationParticipantNames(conversationId);
+  await markConversationRead(conversationId);
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">

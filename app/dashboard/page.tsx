@@ -18,6 +18,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { getNavBadgeCounts } from "@/lib/actions/notifications";
+import { NavBadge } from "@/components/NavBadge";
 import { requireUser } from "@/lib/actions/authGuards";
 
 type SpaceEntry = { id: string; name: string; role: string };
@@ -32,6 +34,8 @@ export default async function DashboardIndex() {
     .eq("id", userId)
     .maybeSingle();
   const isAdmin = profile?.role === "admin";
+  if (profile?.role === "parent") redirect("/dashboard/parent");
+  const { messages: unreadMessages, announcements: unreadAnnouncements } = await getNavBadgeCounts();
 
   const { data: directMemberships } = await supabase
     .from("space_members")
@@ -68,12 +72,20 @@ export default async function DashboardIndex() {
             <Link href="/dashboard/admin/parents" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Parents</Link>
             <Link href="/dashboard/admin/classes" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Classes</Link>
             <Link href="/dashboard/admin/spaces" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Spaces</Link>
+            <Link href="/dashboard/admin/audit-log" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Audit log</Link>
           </div>
         )}
         <div className="mb-4 flex flex-wrap justify-center gap-2">
-          <Link href="/dashboard/announcements" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Announcements</Link>
-          <Link href="/dashboard/messages" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Messages</Link>
+          <Link href="/dashboard/announcements" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">
+            Announcements
+            <NavBadge count={unreadAnnouncements} />
+          </Link>
+          <Link href="/dashboard/messages" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">
+            Messages
+            <NavBadge count={unreadMessages} />
+          </Link>
           <Link href="/dashboard/timetable" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Timetable</Link>
+          <Link href="/dashboard/search" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Search</Link>
         </div>
         <p className="text-ink">
           You&apos;re signed in, but not a member of any space or class yet.
@@ -98,12 +110,20 @@ export default async function DashboardIndex() {
           <Link href="/dashboard/admin/parents" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Parents</Link>
           <Link href="/dashboard/admin/classes" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Classes</Link>
           <Link href="/dashboard/admin/spaces" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Spaces</Link>
+          <Link href="/dashboard/admin/audit-log" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Audit log</Link>
         </div>
       )}
       <div className="mb-4 flex flex-wrap gap-2">
-        <Link href="/dashboard/announcements" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Announcements</Link>
-        <Link href="/dashboard/messages" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Messages</Link>
+        <Link href="/dashboard/announcements" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">
+          Announcements
+          <NavBadge count={unreadAnnouncements} />
+        </Link>
+        <Link href="/dashboard/messages" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">
+          Messages
+          <NavBadge count={unreadMessages} />
+        </Link>
         <Link href="/dashboard/timetable" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Timetable</Link>
+        <Link href="/dashboard/search" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Search</Link>
       </div>
       <h1 className="mb-4 font-display text-xl font-semibold text-ink">Your spaces</h1>
       <ul className="space-y-2">

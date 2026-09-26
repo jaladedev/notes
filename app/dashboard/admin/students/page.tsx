@@ -3,6 +3,8 @@ import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { CreateStudentForm } from "@/components/admin/CreateStudentForm";
 import { AccountActions } from "@/components/admin/AccountActions";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { CsvBulkImport } from "@/components/admin/CsvBulkImport";
+import { bulkCreateStudents } from "@/lib/actions/accountAdmin";
 
 export default async function AdminStudentsPage() {
   await assertGlobalRole(["admin"], "Only an admin can manage student accounts.");
@@ -22,6 +24,15 @@ export default async function AdminStudentsPage() {
       <h1 className="font-display text-xl font-semibold text-ink">Students</h1>
 
       <CreateStudentForm classes={classes ?? []} />
+
+      <CsvBulkImport
+        title="Students"
+        expectedColumns={["fullname", "email", "classname (optional)"]}
+        sampleRow="Ada Obi, ada@example.com, JSS2A"
+        mapRow={(r) => ({ fullName: r.fullname ?? "", email: r.email ?? "", className: r.classname || undefined })}
+        labelKey={(r) => r.email}
+        onImport={bulkCreateStudents}
+      />
 
       <ul className="space-y-2">
         {(students ?? []).map((s) => (

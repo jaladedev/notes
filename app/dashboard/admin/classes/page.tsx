@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { ClassCreateForm } from "@/components/admin/ClassCreateForm";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { CsvBulkImport } from "@/components/admin/CsvBulkImport";
+import { bulkCreateClasses } from "@/lib/actions/notes";
 
 export default async function AdminClassesPage() {
   await requireUser();
@@ -50,6 +52,21 @@ export default async function AdminClassesPage() {
       </ul>
 
       <ClassCreateForm />
+
+      <div className="mt-4">
+        <CsvBulkImport
+          title="Classes"
+          expectedColumns={["name", "educationlevel (primary/jss/sss, optional)", "levelnumber (optional)"]}
+          sampleRow="JSS2A, jss, 2"
+          mapRow={(r) => ({
+            name: r.name ?? "",
+            educationLevel: r.educationlevel || undefined,
+            levelNumber: r.levelnumber || undefined,
+          })}
+          labelKey={(r) => r.name}
+          onImport={bulkCreateClasses}
+        />
+      </div>
     </div>
   );
 }

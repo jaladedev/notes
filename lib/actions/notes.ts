@@ -305,6 +305,56 @@ export async function createClass(name: string, educationLevel?: EducationLevel,
   return klass;
 }
 
+export type BulkClassRowResult = { row: number; name: string; ok: boolean; message: string };
+
+/** CSV import for classes, reusing createClass per row so validation and audit logging stay identical to the single-class form. */
+export async function bulkCreateClasses(
+  rows: { name: string; educationLevel?: string; levelNumber?: string }[]
+): Promise<BulkClassRowResult[]> {
+  await assertGlobalRole(["admin"], "Only an admin can create a class.");
+
+  const validLevels: EducationLevel[] = ["primary", "jss", "sss"];
+  const results: BulkClassRowResult[] = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const rowNumber = i + 2;
+    if (!r.name?.trim()) {
+      results.push({ row: rowNumber, name: r.name || "(missing)", ok: false, message: "Missing class name." });
+      continue;
+    }
+    const level = r.educationLevel?.trim().toLowerCase();
+    if (level && !validLevels.includes(level as EducationLevel)) {
+      results.push({
+        row: rowNumber,
+        name: r.name,
+        ok: false,
+        message: `Level must be primary, jss, or sss (got "${r.educationLevel}").`,
+      });
+      continue;
+    }
+    const levelNumber = r.levelNumber?.trim() ? Number(r.levelNumber) : undefined;
+    if (r.levelNumber?.trim() && (!Number.isFinite(levelNumber) || levelNumber! < 1)) {
+      results.push({ row: rowNumber, name: r.name, ok: false, message: `Invalid level number "${r.levelNumber}".` });
+      continue;
+    }
+    try {
+      await createClass(r.name, level as EducationLevel | undefined, levelNumber);
+      results.push({ row: rowNumber, name: r.name, ok: true, message: "Created." });
+    } catch (err) {
+      results.push({
+        row: rowNumber,
+        name: r.name,
+        ok: false,
+        message: err instanceof Error ? err.message : "Failed to create.",
+      });
+    }
+  }
+
+  revalidatePath("/dashboard/admin/classes");
+  return results;
+}
+
 export async function addClassMember(classId: string, studentEmail: string) {
   // Fixed: same requireUser()-only gap as createClass. Also rewritten
   // to look up by profiles.email (added in 0006_admin_accounts.sql)
