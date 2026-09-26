@@ -196,7 +196,23 @@ export async function createParentAccount(input: {
   return { userId, temporaryPassword };
 }
 
-export type BulkImportRowResult = { row: number; email: string; ok: boolean; message: string };
+export type BulkImportRowResult = {
+  row: number;
+  email: string;
+  ok: boolean;
+  message: string;
+  // Only set on a successful row. There is no other way to retrieve
+  // this after the fact -- Supabase Auth never stores a password
+  // retrievably, only its hash, so if this isn't captured here (and
+  // shown to the admin) it's gone the moment this function returns.
+  // Was previously discarded entirely: bulkCreateStudents generated a
+  // real temp password per row (createStudentAccount does that
+  // unconditionally) but the result type had nowhere to put it, so
+  // after importing N students the admin had no way to get any of them
+  // signed in short of resetting each one individually -- defeating
+  // the point of a bulk import.
+  temporaryPassword?: string;
+};
 
 /**
  * Creates one account per row, reusing createStudentAccount so audit
@@ -233,8 +249,18 @@ export async function bulkCreateStudents(
       continue;
     }
     try {
-      await createStudentAccount({ fullName: r.fullName, email: r.email, classId });
-      results.push({ row: rowNumber, email: r.email, ok: true, message: "Created." });
+      const { temporaryPassword } = await createStudentAccount({
+        fullName: r.fullName,
+        email: r.email,
+        classId,
+      });
+      results.push({
+        row: rowNumber,
+        email: r.email,
+        ok: true,
+        message: "Created.",
+        temporaryPassword,
+      });
     } catch (err) {
       results.push({
         row: rowNumber,

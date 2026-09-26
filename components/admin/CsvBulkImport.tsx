@@ -5,6 +5,14 @@
 // and shows a per-row success/failure report. Column mapping and the
 // action itself are the caller's job -- this component only owns the
 // file-picking, parsing, and results UI.
+//
+// Fixed: a row's temporaryPassword (present only for bulkCreateStudents,
+// where createStudentAccount always generates one) used to be silently
+// dropped -- the results list only ever rendered `message`. After
+// importing N students there was no way to retrieve any of their
+// passwords short of resetting each one individually. Now shown inline
+// per row and offered as a CSV download, since Supabase Auth never
+// stores a password retrievably -- this is the one chance to capture it.
 
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -12,6 +20,29 @@ import { parseCsvWithHeader } from "@/lib/csv";
 import { emitToast } from "@/lib/toast";
 
 type RowResult = { row: number; ok: boolean; message: string } & Record<string, unknown>;
+
+function downloadResultsCsv(rows: RowResult[], title: string) {
+  const hasPassword = rows.some((r) => typeof r.temporaryPassword === "string");
+  const header = ["row", "label", "ok", "message", ...(hasPassword ? ["temporaryPassword"] : [])];
+  const lines = rows.map((r) => {
+    const cells = [
+      String(r.row),
+      String((r as any).label ?? ""),
+      String(r.ok),
+      r.message,
+      ...(hasPassword ? [String(r.temporaryPassword ?? "")] : []),
+    ];
+    // Minimal CSV quoting: wrap and escape any cell with a comma, quote, or newline.
+    return cells.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(",");
+  });
+  const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${title.toLowerCase().replace(/\s+/g, "-")}-import-results.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export function CsvBulkImport<TRow>({
   title,
@@ -91,14 +122,37 @@ export function CsvBulkImport<TRow>({
           {isPending && <p className="text-sm text-ink-soft">Importing…</p>}
 
           {results && !isPending && (
-            <div className="space-y-1 rounded-lg border border-rule bg-paper p-2">
-              <p className="text-xs font-medium text-ink-soft">
-                {results.filter((r) => r.ok).length} of {results.length} succeeded
-              </p>
+            <div className="space-y-2 rounded-lg border border-rule bg-paper p-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-ink-soft">
+                  {results.filter((r) => r.ok).length} of {results.length} succeeded
+                </p>
+                {results.some((r) => typeof r.temporaryPassword === "string") && (
+                  <button
+                    type="button"
+                    onClick={() => downloadResultsCsv(results, title)}
+                    className="rounded-lg border border-rule bg-white px-2 py-1 text-xs text-ink hover:border-marigold"
+                  >
+                    Download passwords (CSV)
+                  </button>
+                )}
+              </div>
+              {results.some((r) => typeof r.temporaryPassword === "string") && (
+                <p className="text-xs text-clay">
+                  Temporary passwords are shown once and can&apos;t be retrieved again — download or
+                  copy them now.
+                </p>
+              )}
               <ul className="max-h-48 space-y-0.5 overflow-y-auto text-xs">
                 {results.map((r, i) => (
                   <li key={i} className={r.ok ? "text-leaf" : "text-clay"}>
                     Row {r.row} ({(r as any).label}): {r.message}
+                    {typeof r.temporaryPassword === "string" && (
+                      <>
+                        {" — "}
+                        <code className="rounded bg-white px-1 text-ink">{r.temporaryPassword}</code>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
