@@ -33,6 +33,9 @@ export async function submitHomework(input: { homeworkId: string; content?: stri
   const { id: studentId } = await requireUser();
   const supabase = createClient();
 
+  // Resubmitting must clear any prior grade -- otherwise a teacher's
+  // grade/feedback for the old content stays attached to whatever the
+  // student just replaced it with, silently mismatched.
   const { error } = await supabase.from("homework_submissions").upsert(
     {
       homework_id: input.homeworkId,
@@ -40,6 +43,10 @@ export async function submitHomework(input: { homeworkId: string; content?: stri
       content: input.content ?? null,
       file_url: input.fileUrl ?? null,
       submitted_at: new Date().toISOString(),
+      grade: null,
+      feedback: null,
+      graded_at: null,
+      graded_by: null,
     },
     { onConflict: "homework_id,student_id" }
   );

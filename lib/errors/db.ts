@@ -27,13 +27,9 @@ const DEFAULT_FALLBACK = "Something went wrong. Please try again.";
  */
 const KNOWN_CONSTRAINTS: Record<string, string> = {
   quiz_answers_attempt_question_unique: "You've already answered this question in this attempt.",
+  quiz_attempts_quiz_student_unique: "You've already started or completed this quiz.",
   homework_submissions_lesson_id_student_id_key:
     "This student has already submitted this homework.",
-  invoice_installments_invoice_sequence_unique:
-    "An installment with this sequence number already exists for this invoice.",
-  report_card_remarks_student_term_year_unique:
-    "A report card remark already exists for this student, term, and year.",
-  enrollments_unique_student_term: "This student is already enrolled for this term.",
   guardian_links_unique_parent_student: "This guardian is already linked to this student.",
   timetable_entries_class_period_unique: "That class already has a lesson in this period.",
   timetable_entries_teacher_period_unique: "That teacher is already teaching another class in this period.",

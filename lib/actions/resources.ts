@@ -135,6 +135,11 @@ export async function updateTopicResource(resourceId: string, formData: FormData
   let newObjectPath: string | null = null;
 
   if (file instanceof File && file.size) {
+    if (existing.resource_type === "link" || existing.resource_type === "diagram_mermaid") {
+      throw new Error(
+        "This is a link/diagram resource, not an uploaded file — use the link or diagram editor instead."
+      );
+    }
     if (file.size > MAX_TOPIC_RESOURCE_BYTES)
       throw new Error("Resources must be 20 MB or smaller.");
     const resourceType = RESOURCE_TYPES.get(file.type);
@@ -196,7 +201,7 @@ export async function deleteTopicResource(resourceId: string) {
 
   const { data: resource } = await supabase
     .from("topic_resources")
-    .select("id, file_url, topic_id")
+    .select("id, file_url, topic_id, resource_type")
     .eq("id", resourceId)
     .single();
   if (!resource) throw new Error("Resource not found.");
@@ -204,7 +209,13 @@ export async function deleteTopicResource(resourceId: string) {
   await assertTeacherOwnsTopic(supabase, resource.topic_id);
 
   const admin = createAdminClient();
-  if (resource.file_url) {
+  // Only image/pdf/audio/video resources store a real storage object
+  // path in file_url. "link" resources store an external og:image URL
+  // there instead -- passing that to storage.remove() would be a no-op
+  // at best, or (in principle) a wrong deletion if it ever collided with
+  // a real path, so only attempt it for actual uploaded-file types.
+  const isUploadedFile = resource.resource_type !== "link" && resource.resource_type !== "diagram_mermaid";
+  if (resource.file_url && isUploadedFile) {
     await admin.storage.from(TOPIC_RESOURCE_BUCKET).remove([resource.file_url]);
   }
 

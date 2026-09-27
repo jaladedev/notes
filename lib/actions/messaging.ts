@@ -8,9 +8,15 @@ import { throwDbError } from "@/lib/errors/db";
 /** Finds an existing 1:1 conversation between the two users, or creates one. */
 export async function getOrCreateDirectConversation(otherProfileId: string) {
   const { id: userId } = await requireUser();
-  const admin = createClient();
+  // Reads can go through the request-scoped client (RLS allows a member
+  // to see their own conversation_members rows), but there is no INSERT
+  // policy on conversations/conversation_members -- creating a new DM
+  // must go through the admin client, or every first-contact message
+  // fails with an RLS permission error.
+  const supabase = createClient();
+  const admin = createAdminClient();
 
-  const { data: mine } = await admin
+  const { data: mine } = await supabase
     .from("conversation_members")
     .select("conversation_id")
     .eq("profile_id", userId);
@@ -149,11 +155,13 @@ export async function getConversationParticipantNames(
   // the actual access check. The admin client below only fills in
   // names, which profiles RLS would otherwise hide for anyone but the
   // caller themselves.
+  const { id: userId } = await requireUser();
   const supabase = createClient();
   const { data: membership } = await supabase
     .from("conversation_members")
     .select("conversation_id")
     .eq("conversation_id", conversationId)
+    .eq("profile_id", userId)
     .maybeSingle();
   if (!membership) return {};
 

@@ -79,6 +79,20 @@ export async function startQuizAttempt(quizId: string) {
   const { id: studentId } = await requireUser();
   const supabase = createClient();
 
+  // One attempt per student per quiz (quiz_attempts_quiz_student_unique,
+  // 0018) -- look up-or-resume rather than blindly inserting, since a
+  // second insert would now hit that constraint.
+  const { data: existing } = await supabase
+    .from("quiz_attempts")
+    .select("id, submitted_at")
+    .eq("quiz_id", quizId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (existing) {
+    if (existing.submitted_at) throw new Error("You've already completed this quiz.");
+    return { attemptId: existing.id };
+  }
+
   const { data: attempt, error } = await supabase
     .from("quiz_attempts")
     .insert({ quiz_id: quizId, student_id: studentId })

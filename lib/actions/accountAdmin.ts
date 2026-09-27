@@ -54,12 +54,13 @@ export async function createTeacherAccount(input: {
 }): Promise<NewAccountResult> {
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can create accounts.");
   const admin = createAdminClient();
-  await assertEmailAvailable(admin, input.email);
+  const email = input.email.trim().toLowerCase();
+  await assertEmailAvailable(admin, email);
 
   const temporaryPassword = generateTempPassword();
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: input.email,
+    email,
     password: temporaryPassword,
     email_confirm: true,
   });
@@ -72,7 +73,7 @@ export async function createTeacherAccount(input: {
     id: userId,
     role: "teacher",
     full_name: input.fullName,
-    email: input.email,
+    email,
     must_change_password: true,
   });
   if (profileError) {
@@ -99,12 +100,13 @@ export async function createStudentAccount(input: {
 }): Promise<NewAccountResult> {
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can create accounts.");
   const admin = createAdminClient();
-  await assertEmailAvailable(admin, input.email);
+  const email = input.email.trim().toLowerCase();
+  await assertEmailAvailable(admin, email);
 
   const temporaryPassword = generateTempPassword();
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: input.email,
+    email,
     password: temporaryPassword,
     email_confirm: true,
   });
@@ -117,7 +119,7 @@ export async function createStudentAccount(input: {
     id: userId,
     role: "student",
     full_name: input.fullName,
-    email: input.email,
+    email,
     must_change_password: true,
   });
   if (profileError) {
@@ -151,12 +153,13 @@ export async function createParentAccount(input: {
 }): Promise<NewAccountResult> {
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can create accounts.");
   const admin = createAdminClient();
-  await assertEmailAvailable(admin, input.email);
+  const email = input.email.trim().toLowerCase();
+  await assertEmailAvailable(admin, email);
 
   const temporaryPassword = generateTempPassword();
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email: input.email,
+    email,
     password: temporaryPassword,
     email_confirm: true,
   });
@@ -169,7 +172,7 @@ export async function createParentAccount(input: {
     id: userId,
     role: "parent",
     full_name: input.fullName,
-    email: input.email,
+    email,
     must_change_password: true,
   });
   if (profileError) {

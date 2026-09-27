@@ -105,7 +105,7 @@ export function createClient() {
 
 // Shared by every server-side call site that needs the current user (this
 // file's getCurrentProfile, plus assertRole/clearMustChangePassword in
-// lib/actions/authGuards.ts and the ownership check in lib/actions/fees.ts).
+// lib/actions/authGuards.ts).
 // Extracted so all of them get the same retry-on-transient-network-blip
 // behavior -- a raw, unguarded `await supabase.auth.getUser()` treats a
 // network hiccup exactly the same as "not signed in" (both come back as
