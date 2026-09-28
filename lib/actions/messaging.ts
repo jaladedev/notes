@@ -4,9 +4,16 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
+import { toResult, type ActionResult } from "@/lib/actions/result";
 
 /** Finds an existing 1:1 conversation between the two users, or creates one. */
-export async function getOrCreateDirectConversation(otherProfileId: string) {
+export async function getOrCreateDirectConversation(
+  ...args: Parameters<typeof getOrCreateDirectConversationImpl>
+): Promise<ActionResult<{ conversationId: string }>> {
+  return toResult(() => getOrCreateDirectConversationImpl(...args));
+}
+
+async function getOrCreateDirectConversationImpl(otherProfileId: string) {
   const { id: userId } = await requireUser();
   // Reads can go through the request-scoped client (RLS allows a member
   // to see their own conversation_members rows), but there is no INSERT

@@ -17,8 +17,12 @@ export function CreateTeacherForm() {
     e.preventDefault();
     startTransition(async () => {
       try {
-        const { temporaryPassword } = await createTeacherAccount({ fullName, email });
-        setCreated({ email, password: temporaryPassword });
+        const result = await createTeacherAccount({ fullName, email });
+        if (!result.ok) {
+          emitToast(result.error, "error");
+          return;
+        }
+        setCreated({ email, password: result.data.temporaryPassword });
         setFullName("");
         setEmail("");
         router.refresh();

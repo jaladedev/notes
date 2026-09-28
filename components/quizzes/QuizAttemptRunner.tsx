@@ -35,7 +35,8 @@ export function QuizAttemptRunner({
     setAnswers((a) => ({ ...a, [questionId]: optionId }));
     startTransition(async () => {
       try {
-        await answerQuizQuestion({ attemptId, questionId, optionId });
+        const saved = await answerQuizQuestion({ attemptId, questionId, optionId });
+        if (!saved.ok) emitToast(saved.error, "error");
       } catch (err: unknown) {
         emitToast(err instanceof Error ? err.message : "Couldn't save that answer.", "error");
       }
@@ -49,8 +50,12 @@ export function QuizAttemptRunner({
     }
     startTransition(async () => {
       try {
-        const score = await submitQuizAttempt(attemptId);
-        if (score) setResult(score);
+        const submitted = await submitQuizAttempt(attemptId);
+        if (!submitted.ok) {
+          emitToast(submitted.error, "error");
+          return;
+        }
+        if (submitted.data) setResult(submitted.data);
         router.refresh();
       } catch (err: unknown) {
         emitToast(err instanceof Error ? err.message : "Couldn't submit that attempt.", "error");

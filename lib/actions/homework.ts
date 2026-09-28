@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assertSpaceRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
+import { toResult, type ActionResult } from "@/lib/actions/result";
 
 export async function createHomework(input: {
   topicId: string;
@@ -29,7 +30,13 @@ export async function createHomework(input: {
   revalidatePath(`/dashboard/teacher/notes/${input.topicId}`);
 }
 
-export async function submitHomework(input: { homeworkId: string; content?: string; fileUrl?: string }) {
+export async function submitHomework(
+  ...args: Parameters<typeof submitHomeworkImpl>
+): Promise<ActionResult<void>> {
+  return toResult(() => submitHomeworkImpl(...args));
+}
+
+async function submitHomeworkImpl(input: { homeworkId: string; content?: string; fileUrl?: string }) {
   const { id: studentId } = await requireUser();
   const supabase = createClient();
 

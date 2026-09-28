@@ -22,8 +22,12 @@ export function NewMessageForm() {
   function startConversation(otherId: string) {
     startTransition(async () => {
       try {
-        const { conversationId } = await getOrCreateDirectConversation(otherId);
-        router.push(`/dashboard/messages/${conversationId}`);
+        const result = await getOrCreateDirectConversation(otherId);
+        if (!result.ok) {
+          emitToast(result.error, "error");
+          return;
+        }
+        router.push(`/dashboard/messages/${result.data.conversationId}`);
       } catch (err: unknown) {
         emitToast(err instanceof Error ? err.message : "Couldn't start that conversation.", "error");
       }

@@ -18,12 +18,16 @@ export function CreateStudentForm({ classes }: { classes: { id: string; name: st
     e.preventDefault();
     startTransition(async () => {
       try {
-        const { temporaryPassword } = await createStudentAccount({
+        const result = await createStudentAccount({
           fullName,
           email,
           classId: classId || undefined,
         });
-        setCreated({ email, password: temporaryPassword });
+        if (!result.ok) {
+          emitToast(result.error, "error");
+          return;
+        }
+        setCreated({ email, password: result.data.temporaryPassword });
         setFullName("");
         setEmail("");
         router.refresh();

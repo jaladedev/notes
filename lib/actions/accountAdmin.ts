@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
+import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
 
 const TEMP_PASSWORD_WORDS = [
@@ -48,7 +49,13 @@ async function deleteUserAfterFailedSetup(admin: ReturnType<typeof createAdminCl
 
 type NewAccountResult = { userId: string; temporaryPassword: string };
 
-export async function createTeacherAccount(input: {
+export async function createTeacherAccount(
+  ...args: Parameters<typeof createTeacherAccountImpl>
+): Promise<ActionResult<NewAccountResult>> {
+  return toResult(() => createTeacherAccountImpl(...args));
+}
+
+async function createTeacherAccountImpl(input: {
   fullName: string;
   email: string;
 }): Promise<NewAccountResult> {
@@ -93,7 +100,13 @@ export async function createTeacherAccount(input: {
   return { userId, temporaryPassword };
 }
 
-export async function createStudentAccount(input: {
+export async function createStudentAccount(
+  ...args: Parameters<typeof createStudentAccountImpl>
+): Promise<ActionResult<NewAccountResult>> {
+  return toResult(() => createStudentAccountImpl(...args));
+}
+
+async function createStudentAccountImpl(input: {
   fullName: string;
   email: string;
   classId?: string;
@@ -146,7 +159,13 @@ export async function createStudentAccount(input: {
   return { userId, temporaryPassword };
 }
 
-export async function createParentAccount(input: {
+export async function createParentAccount(
+  ...args: Parameters<typeof createParentAccountImpl>
+): Promise<ActionResult<NewAccountResult>> {
+  return toResult(() => createParentAccountImpl(...args));
+}
+
+async function createParentAccountImpl(input: {
   fullName: string;
   email: string;
   childStudentIds: string[];
@@ -252,7 +271,7 @@ export async function bulkCreateStudents(
       continue;
     }
     try {
-      const { temporaryPassword } = await createStudentAccount({
+      const { temporaryPassword } = await createStudentAccountImpl({
         fullName: r.fullName,
         email: r.email,
         classId,

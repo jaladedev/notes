@@ -20,7 +20,11 @@ export function SubmitHomeworkForm({
     e.preventDefault();
     startTransition(async () => {
       try {
-        await submitHomework({ homeworkId, content: content || undefined });
+        const result = await submitHomework({ homeworkId, content: content || undefined });
+        if (!result.ok) {
+          emitToast(result.error, "error");
+          return;
+        }
         router.refresh();
         emitToast("Submitted.", "success");
       } catch (err: unknown) {

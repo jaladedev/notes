@@ -24,12 +24,16 @@ export function CreateParentForm({ students }: { students: { id: string; full_na
     e.preventDefault();
     startTransition(async () => {
       try {
-        const { temporaryPassword } = await createParentAccount({
+        const result = await createParentAccount({
           fullName,
           email,
           childStudentIds: childIds,
         });
-        setCreated({ email, password: temporaryPassword });
+        if (!result.ok) {
+          emitToast(result.error, "error");
+          return;
+        }
+        setCreated({ email, password: result.data.temporaryPassword });
         setFullName("");
         setEmail("");
         setChildIds([]);

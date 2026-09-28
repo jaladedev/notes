@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { assertSpaceRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
+import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
 
 export async function createQuizWithQuestions(input: {
@@ -102,7 +103,13 @@ export async function startQuizAttempt(quizId: string) {
   return { attemptId: attempt!.id };
 }
 
-export async function answerQuizQuestion(input: { attemptId: string; questionId: string; optionId: string }) {
+export async function answerQuizQuestion(
+  ...args: Parameters<typeof answerQuizQuestionImpl>
+): Promise<ActionResult<void>> {
+  return toResult(() => answerQuizQuestionImpl(...args));
+}
+
+async function answerQuizQuestionImpl(input: { attemptId: string; questionId: string; optionId: string }) {
   const supabase = createClient();
   // RLS (quiz_answers_own) restricts writes to the attempt's own student.
   const { error } = await supabase.from("quiz_answers").upsert(
@@ -112,7 +119,13 @@ export async function answerQuizQuestion(input: { attemptId: string; questionId:
   if (error) throwDbError(error);
 }
 
-export async function submitQuizAttempt(attemptId: string) {
+export async function submitQuizAttempt(
+  ...args: Parameters<typeof submitQuizAttemptImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof submitQuizAttemptImpl>>>> {
+  return toResult(() => submitQuizAttemptImpl(...args));
+}
+
+async function submitQuizAttemptImpl(attemptId: string) {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("submit_quiz_attempt", { p_attempt_id: attemptId });
   if (error) throwDbError(error);
