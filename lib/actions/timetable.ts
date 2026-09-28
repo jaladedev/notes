@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertGlobalRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
+import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
 import {
   DEFAULT_TIME_ZONE,
@@ -192,6 +193,44 @@ export async function saveSchoolTimeZone(timeZone: string) {
 
   await writeAuditLog({ actorId: admin_.id, action: "timetable.timezone_save", targetType: "settings", metadata: { timeZone: tz } });
   revalidateTimetable();
+}
+
+export async function getTermWeekInfo(): Promise<{ termStart: string | null; currentWeek: number | null }> {
+  await requireUser();
+  const supabase = createClient();
+  const [{ data: row }, { data: week }] = await Promise.all([
+    supabase.from("settings").select("term_start_date").maybeSingle(),
+    supabase.rpc("current_school_week"),
+  ]);
+  return {
+    termStart: (row as { term_start_date?: string | null } | null)?.term_start_date ?? null,
+    currentWeek: typeof week === "number" ? week : null,
+  };
+}
+
+/** Set the date Week 1 starts (YYYY-MM-DD), or null to switch the week gate off. */
+export async function saveTermStartDate(date: string | null): Promise<ActionResult> {
+  return toResult(async () => {
+    const admin_ = await assertGlobalRole(["admin"], "Only an admin can change the term start date.");
+    const value = date?.trim() || null;
+    if (value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value)))) {
+      throw new Error("That isn't a valid date.");
+    }
+
+    const supabase = createClient();
+    const { error } = await supabase.from("settings").update({ term_start_date: value }).eq("id", true);
+    if (error) throwDbError(error);
+
+    await writeAuditLog({
+      actorId: admin_.id,
+      action: "settings.term_start_save",
+      targetType: "settings",
+      metadata: { termStart: value },
+    });
+    revalidateTimetable();
+    revalidatePath("/dashboard/student", "layout");
+    return undefined;
+  });
 }
 
 // ---------- Lessons (admin) ----------

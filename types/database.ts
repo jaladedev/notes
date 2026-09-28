@@ -74,6 +74,10 @@ export type Database = {
       { Row: any; Relationships: [] }
     >;
     Functions: {
+      current_school_week: {
+        Args: Record<string, never>;
+        Returns: number | null;
+      };
       submit_quiz_attempt: {
         Args: { p_attempt_id: string };
         Returns: { score: number; total_points: number }[];

@@ -1,6 +1,6 @@
 // Ported concept from school_app's student topic page, rewritten
-// against this app's schema (no education-level/week gating -- release
-// is just topic_notes.release_at, see plan doc section 5).
+// against this app's schema. Visibility (release_at, moderation, class/space
+// membership and the week_number gate from 0019) is all enforced by RLS.
 
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -24,7 +24,7 @@ export default async function StudentTopicPage({
     .single();
   if (!topic) notFound();
 
-  // RLS (topic_note_visible) already enforces release_at/moderation/membership --
+  // RLS (topic_note_visible) already enforces release_at/moderation/week/membership --
   // if the student can't see it, this just returns null.
   const { data: note } = await supabase
     .from("topic_notes")

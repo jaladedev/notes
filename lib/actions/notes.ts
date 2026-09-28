@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertGlobalRole, assertSpaceRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
+import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
 import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
 
@@ -398,6 +399,66 @@ export async function removeClassMember(classId: string, profileId: string) {
   revalidatePath(`/dashboard/admin/classes/${classId}`);
 }
 
+/**
+ * Move every student on `fromClassId`'s roster to `toClassId` (e.g. JSS2A ->
+ * JSS3A). Pass `toClassId = null` to graduate them (remove from the class
+ * without enrolling anywhere). Old spaces and their notes are untouched --
+ * they stay with the old class for the next cohort. Students are added to
+ * the new class *before* being removed from the old one, so a failure part
+ * way never leaves anyone with no class.
+ */
+export async function promoteClass(
+  fromClassId: string,
+  toClassId: string | null
+): Promise<ActionResult<{ moved: number }>> {
+  return toResult(async () => {
+    const admin_ = await assertGlobalRole(["admin"], "Only an admin can promote a class.");
+    if (toClassId && toClassId === fromClassId) {
+      throw new Error("Pick a different class to promote into.");
+    }
+
+    const admin = createAdminClient();
+    const { data: members, error: readError } = await admin
+      .from("class_members")
+      .select("profile_id")
+      .eq("class_id", fromClassId);
+    if (readError) throwDbError(readError);
+
+    const ids = (members ?? []).map((m) => m.profile_id as string);
+    if (ids.length === 0) throw new Error("That class has no students to promote.");
+
+    if (toClassId) {
+      const { error: addError } = await admin
+        .from("class_members")
+        .upsert(
+          ids.map((profile_id) => ({ class_id: toClassId, profile_id })),
+          { onConflict: "class_id,profile_id" }
+        );
+      if (addError) throwDbError(addError);
+    }
+
+    const { error: removeError } = await admin
+      .from("class_members")
+      .delete()
+      .eq("class_id", fromClassId)
+      .in("profile_id", ids);
+    if (removeError) throwDbError(removeError);
+
+    await writeAuditLog({
+      actorId: admin_.id,
+      action: "class.promote",
+      targetType: "class",
+      targetId: fromClassId,
+      metadata: { toClassId, moved: ids.length },
+    });
+
+    revalidatePath("/dashboard/admin/classes");
+    revalidatePath(`/dashboard/admin/classes/${fromClassId}`);
+    if (toClassId) revalidatePath(`/dashboard/admin/classes/${toClassId}`);
+    return { moved: ids.length };
+  });
+}
+
 export async function createSubject(name: string) {
   // Fixed: same requireUser()-only gap as createClass/addClassMember
   // above -- any signed-in account could create subjects.
@@ -711,7 +772,7 @@ export async function resolveShareLink(token: string, accessCode?: string) {
 
   const { data: topic } = await admin
     .from("topics")
-    .select("id, title")
+    .select("id, title, week_number")
     .eq("id", link.topic_id)
     .single();
   if (!topic) return { error: "not_found" as const };
@@ -729,6 +790,15 @@ export async function resolveShareLink(token: string, accessCode?: string) {
   if (!note) return { error: "not_found" as const };
   if (note.release_at && new Date(note.release_at) > new Date()) {
     return { error: "not_found" as const };
+  }
+
+  // Same week gate as topic_note_visible(): a topic for a future week
+  // isn't shareable yet. Null week/term start means no gate.
+  if (topic.week_number != null) {
+    const { data: currentWeek } = await admin.rpc("current_school_week");
+    if (typeof currentWeek === "number" && topic.week_number > currentWeek) {
+      return { error: "not_found" as const };
+    }
   }
 
   const { data: resources } = await admin

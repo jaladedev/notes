@@ -8,6 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { ClassRosterPanel } from "@/components/admin/ClassRosterPanel";
+import { PromoteClassPanel } from "@/components/admin/PromoteClassPanel";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function AdminClassPage({
@@ -32,6 +33,12 @@ export default async function AdminClassPage({
     .select("id, name")
     .eq("class_id", classId);
 
+  const { data: otherClasses } = await supabase
+    .from("classes")
+    .select("id, name")
+    .neq("id", classId)
+    .order("name");
+
   return (
     <div className="mx-auto max-w-lg space-y-6 p-4 sm:p-6">
       <Breadcrumbs
@@ -44,6 +51,13 @@ export default async function AdminClassPage({
       <h1 className="font-display text-xl font-semibold text-ink">{klass.name}</h1>
 
       <ClassRosterPanel classId={classId} members={(members ?? []) as any} />
+
+      <PromoteClassPanel
+        classId={classId}
+        className={klass.name}
+        studentCount={(members ?? []).length}
+        otherClasses={otherClasses ?? []}
+      />
 
       <section className="rounded-xl border border-rule bg-white p-4">
         <h2 className="mb-3 font-display text-lg font-semibold text-ink">

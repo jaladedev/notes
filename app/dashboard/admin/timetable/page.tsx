@@ -6,17 +6,19 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { assertGlobalRole } from "@/lib/actions/authGuards";
-import { getSchoolTimeZone, getTimetable } from "@/lib/actions/timetable";
+import { getSchoolTimeZone, getTermWeekInfo, getTimetable } from "@/lib/actions/timetable";
 import { PeriodsPanel } from "@/components/admin/PeriodsPanel";
+import { TermStartPanel } from "@/components/admin/TermStartPanel";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function AdminTimetablePage() {
   await assertGlobalRole(["admin"], "Only an admin can manage the timetable.");
   const supabase = createClient();
 
-  const [{ periods }, timeZone, { data: classes }, { data: entries }] = await Promise.all([
+  const [{ periods }, timeZone, weekInfo, { data: classes }, { data: entries }] = await Promise.all([
     getTimetable(),
     getSchoolTimeZone(),
+    getTermWeekInfo(),
     supabase.from("classes").select("id, name, education_level, level_number").order("name"),
     supabase.from("timetable_entries").select("class_id"),
   ]);
@@ -30,6 +32,8 @@ export default async function AdminTimetablePage() {
       <h1 className="font-display text-xl font-semibold text-ink">Timetable</h1>
 
       <PeriodsPanel periods={periods} timeZone={timeZone} />
+
+      <TermStartPanel termStart={weekInfo.termStart} currentWeek={weekInfo.currentWeek} />
 
       <section className="rounded-xl border border-rule bg-white p-4">
         <h2 className="mb-3 font-display text-lg font-semibold text-ink">Classes</h2>

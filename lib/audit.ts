@@ -16,6 +16,8 @@ type AuditAction =
   | "note.delete_version"
   | "space.create"
   | "class.create"
+  | "class.promote"
+  | "settings.term_start_save"
   | "timetable.period_save"
   | "timetable.period_delete"
   | "timetable.timezone_save"
