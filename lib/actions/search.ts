@@ -7,8 +7,8 @@ export type NoteSearchResult = {
   noteId: string;
   topicId: string;
   topicTitle: string;
-  spaceId: string;
-  spaceName: string;
+  subjectId: string;
+  subjectName: string;
   snippet: string;
 };
 
@@ -50,7 +50,7 @@ export async function searchNotes(query: string): Promise<NoteSearchResult[]> {
   // punctuation) much better than plainto_tsquery/to_tsquery would.
   const { data, error } = await supabase
     .from("topic_notes")
-    .select("id, content, status, topic_id, topics(title, space_id, spaces(name))")
+    .select("id, content, status, topic_id, topics(title, subject_id, subjects(name))")
     .textSearch("search_vector", trimmed, { type: "websearch", config: "english" })
     .eq("status", "published")
     .limit(25);
@@ -61,8 +61,8 @@ export async function searchNotes(query: string): Promise<NoteSearchResult[]> {
     noteId: n.id,
     topicId: n.topic_id,
     topicTitle: n.topics?.title ?? "Untitled topic",
-    spaceId: n.topics?.space_id ?? "",
-    spaceName: n.topics?.spaces?.name ?? "Space",
+    subjectId: n.topics?.subject_id ?? "",
+    subjectName: n.topics?.subjects?.name ?? "Subject",
     snippet: buildSnippet(n.content ?? "", trimmed),
   }));
 }

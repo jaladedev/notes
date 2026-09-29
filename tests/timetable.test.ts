@@ -26,8 +26,7 @@ const row = (over: Partial<TimetableRow>): TimetableRow => ({
   id: "r1",
   class_id: "c1",
   class_name: "JSS1A",
-  space_id: "s1",
-  space_name: "JSS1A Basic Science",
+  subject_id: "sub1",
   subject_name: "Basic Science",
   teacher_id: "t1",
   teacher_name: "Ms Ade",
@@ -114,13 +113,13 @@ describe("toBellEntries", () => {
     expect(entries.map((e) => e.id)).toEqual(["a", "b"]);
     expect(entries[0]).toMatchObject({ startTime: "08:00:00", subjectName: "Basic Science", className: "JSS1A" });
   });
-  it("falls back to the space name and skips breaks and unknown periods", () => {
+  it("skips breaks and unknown periods, and tolerates a missing subject name", () => {
     const entries = toBellEntries(
       [row({ subject_name: null, period_number: 1 }), row({ id: "brk", period_number: 3 }), row({ id: "ghost", period_number: 9 })],
       periods,
       1
     );
     expect(entries).toHaveLength(1);
-    expect(entries[0].subjectName).toBe("JSS1A Basic Science");
+    expect(entries[0].subjectName).toBe("");
   });
 });

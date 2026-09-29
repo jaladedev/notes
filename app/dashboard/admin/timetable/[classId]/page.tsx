@@ -1,13 +1,13 @@
-// One class's weekly timetable, editable by an admin. The subject choices
-// are the spaces linked to this class; the teacher choices are each
-// space's teachers.
+// One class's weekly timetable, editable by an admin. Every subject is a
+// choice; the teacher choices are that subject's assigned teachers
+// (teacher_subjects, 0020) rather than a per-space roster.
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { getTimetable } from "@/lib/actions/timetable";
-import { TimetableEditor, type EditorSpace } from "@/components/timetable/TimetableEditor";
+import { TimetableEditor, type EditorSubject } from "@/components/timetable/TimetableEditor";
 
 export default async function AdminClassTimetablePage({
   params,
@@ -23,28 +23,22 @@ export default async function AdminClassTimetablePage({
 
   const { periods, rows } = await getTimetable({ classId });
 
-  const { data: spaceRows } = await supabase
-    .from("spaces")
-    .select("id, name, subjects(name)")
-    .eq("class_id", classId)
-    .order("name");
-  const spaceIds = (spaceRows ?? []).map((s) => s.id);
+  const { data: subjectRows } = await supabase.from("subjects").select("id, name").order("name");
+  const subjectIds = (subjectRows ?? []).map((s) => s.id);
 
-  const { data: members } = spaceIds.length
+  const { data: assignments } = subjectIds.length
     ? await supabase
-        .from("space_members")
-        .select("space_id, profile_id, role, profiles(full_name)")
-        .in("space_id", spaceIds)
-        .in("role", ["teacher", "admin"])
+        .from("teacher_subjects")
+        .select("subject_id, profile_id, profiles(full_name)")
+        .in("subject_id", subjectIds)
     : { data: [] };
 
-  const spaces: EditorSpace[] = (spaceRows ?? []).map((s: any) => ({
+  const subjects: EditorSubject[] = (subjectRows ?? []).map((s: any) => ({
     id: s.id,
     name: s.name,
-    subjectName: s.subjects?.name ?? null,
-    teachers: (members ?? [])
-      .filter((m: any) => m.space_id === s.id)
-      .map((m: any) => ({ id: m.profile_id, name: m.profiles?.full_name ?? m.profile_id })),
+    teachers: (assignments ?? [])
+      .filter((a: any) => a.subject_id === s.id)
+      .map((a: any) => ({ id: a.profile_id, name: a.profiles?.full_name ?? a.profile_id })),
   }));
 
   return (
@@ -56,7 +50,7 @@ export default async function AdminClassTimetablePage({
         <h1 className="font-display text-xl font-semibold text-ink">{klass.name}</h1>
       </div>
 
-      <TimetableEditor classId={classId} periods={periods} rows={rows} spaces={spaces} />
+      <TimetableEditor classId={classId} periods={periods} rows={rows} subjects={subjects} />
     </div>
   );
 }

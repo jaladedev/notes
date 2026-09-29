@@ -47,18 +47,25 @@ export async function getParentDigest(): Promise<ChildDigest[]> {
     childIds.map(async (studentId) => {
       const { data: classRows } = await admin
         .from("class_members")
-        .select("class_id")
+        .select("classes(education_level, level_number)")
         .eq("profile_id", studentId);
-      const classIds = (classRows ?? []).map((c) => c.class_id);
-      const { data: spaceRows } = classIds.length
-        ? await admin.from("spaces").select("id").in("class_id", classIds)
-        : { data: [] };
-      const spaceIds = (spaceRows ?? []).map((s) => s.id);
+      const levels = new Set(
+        (classRows ?? [])
+          .map((c: any) => c.classes)
+          .filter((k: any) => k?.education_level && k?.level_number)
+          .map((k: any) => `${k.education_level}::${k.level_number}`)
+      );
 
-      const { data: topicRows } = spaceIds.length
-        ? await admin.from("topics").select("id").in("space_id", spaceIds)
-        : { data: [] };
-      const topicIds = (topicRows ?? []).map((t) => t.id);
+      let topicIds: string[] = [];
+      for (const key of levels) {
+        const [level, levelNumber] = key.split("::");
+        const { data: topicRows } = await admin
+          .from("topics")
+          .select("id")
+          .eq("education_level", level)
+          .eq("level_number", Number(levelNumber));
+        topicIds.push(...(topicRows ?? []).map((t) => t.id));
+      }
 
       const { data: homeworkRows } = topicIds.length
         ? await admin

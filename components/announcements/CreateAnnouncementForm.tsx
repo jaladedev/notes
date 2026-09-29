@@ -7,22 +7,22 @@ import { emitToast } from "@/lib/toast";
 
 export function CreateAnnouncementForm({
   isAdmin,
-  spaces,
+  classes,
 }: {
   isAdmin: boolean;
-  spaces: { id: string; name: string }[];
+  classes: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [spaceId, setSpaceId] = useState(isAdmin ? "" : spaces[0]?.id ?? "");
+  const [classId, setClassId] = useState(isAdmin ? "" : classes[0]?.id ?? "");
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
       try {
-        await createAnnouncement({ title, body, spaceId: spaceId || undefined });
+        await createAnnouncement({ title, body, classId: classId || undefined });
         setTitle("");
         setBody("");
         router.refresh();
@@ -54,23 +54,23 @@ export function CreateAnnouncementForm({
         rows={3}
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
       />
-      {spaces.length > 0 && (
+      {classes.length > 0 && (
         <select
-          value={spaceId}
-          onChange={(e) => setSpaceId(e.target.value)}
+          value={classId}
+          onChange={(e) => setClassId(e.target.value)}
           title="Who this announcement targets"
           className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
         >
           {isAdmin && <option value="">School-wide</option>}
-          {spaces.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
             </option>
           ))}
         </select>
       )}
-      {spaces.length === 0 && isAdmin && (
-        <p className="text-xs text-ink-soft">Posting school-wide (you don&apos;t administer any spaces).</p>
+      {classes.length === 0 && isAdmin && (
+        <p className="text-xs text-ink-soft">Posting school-wide.</p>
       )}
       <button
         type="submit"

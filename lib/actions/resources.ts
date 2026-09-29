@@ -4,12 +4,12 @@
 // at clone SHA 466c538. Video/link/mermaid resource variants are dropped
 // for the v1 cut (file upload only) -- see plan doc section 3. Ownership
 // check (assertTeacherOwnsTopic) is remapped from subjects_taught to
-// space membership.
+// subject assignment (teacher_subjects) rather than space membership.
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { assertSpaceRole, requireUser } from "@/lib/actions/authGuards";
+import { assertSubjectRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
 import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
 import type { ResourceType } from "@/types/database";
@@ -33,11 +33,11 @@ async function assertTeacherOwnsTopic(
 ) {
   const { data: topic } = await supabase
     .from("topics")
-    .select("space_id")
+    .select("subject_id")
     .eq("id", topicId)
     .single();
   if (!topic) throw new Error("Topic not found.");
-  await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
   return topic;
 }
 
@@ -228,7 +228,7 @@ export async function deleteTopicResource(resourceId: string) {
 
 // ---------- Video embed, link preview, and Mermaid diagram resources ----------
 // Ported from teacher.ts lines 1024-1252. Ownership check remapped to
-// assertTeacherOwnsTopic (space-scoped) same as the rest of this file.
+// assertTeacherOwnsTopic (subject-scoped) same as the rest of this file.
 
 import { videoEmbedUrl } from "@/lib/video-embed";
 import { fetchLinkMetadata } from "@/lib/linkPreview";

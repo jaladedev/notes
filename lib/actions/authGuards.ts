@@ -7,8 +7,8 @@
 // Two separate guards now, because this app has two separate notions of
 // role: assertGlobalRole checks profiles.role (admin/teacher/student/
 // parent -- set only by accountAdmin.ts, never by the user), used for
-// school-wide actions (creating accounts, classes, subjects). assertSpaceRole
-// checks space_members (teacher/reviewer/admin/student within one space),
+// school-wide actions (creating accounts, classes, subjects). assertSubjectRole
+// checks teacher_subjects (teacher/reviewer within one subject),
 // used for anything scoped to a single space's notes/resources.
 
 import type { User } from "@supabase/supabase-js";
@@ -16,7 +16,7 @@ import { createClient, getUserWithRetry } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TRANSIENT_AUTH_ERROR_MESSAGE } from "@/lib/authErrors";
 
-type SpaceRole = "teacher" | "reviewer" | "admin" | "student";
+type SubjectRole = "teacher" | "reviewer";
 type GlobalRole = "admin" | "teacher" | "student" | "parent";
 
 export async function getAuthenticatedUser(): Promise<User> {
@@ -64,36 +64,37 @@ export async function assertGlobalRole(
 }
 
 /**
- * Verifies the current user is a member of `spaceId` with one of
- * `allowedRoles`. Also re-checks the account is active (a deactivated
- * teacher shouldn't keep editing notes just because their JWT is still
- * valid and their space_members row untouched).
+ * Verifies the current user is assigned to `subjectId` (teacher_subjects)
+ * with one of `allowedRoles`, or is a global admin (who can act on any
+ * subject without a teacher_subjects row -- same as RLS's is_subject_staff /
+ * is_subject_reviewer). Also re-checks the account is active.
  */
-export async function assertSpaceRole(
-  spaceId: string,
-  allowedRoles: SpaceRole[]
-): Promise<{ id: string; role: SpaceRole }> {
+export async function assertSubjectRole(
+  subjectId: string,
+  allowedRoles: SubjectRole[]
+): Promise<{ id: string; role: SubjectRole | "admin" }> {
   const user = await getAuthenticatedUser();
   const admin = createAdminClient();
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("is_active")
+    .select("role, is_active")
     .eq("id", user.id)
     .maybeSingle();
   if (!profile?.is_active) throw new Error("Your account has been deactivated.");
+  if (profile.role === "admin") return { id: user.id, role: "admin" };
 
-  const { data: membership, error } = await admin
-    .from("space_members")
+  const { data: assignment, error } = await admin
+    .from("teacher_subjects")
     .select("role")
-    .eq("space_id", spaceId)
+    .eq("subject_id", subjectId)
     .eq("profile_id", user.id)
     .maybeSingle();
 
   if (error) throw new Error("Could not verify access.", { cause: error });
-  if (!membership || !allowedRoles.includes(membership.role as SpaceRole)) {
-    throw new Error("You don't have access to this space.");
+  if (!assignment || !allowedRoles.includes(assignment.role as SubjectRole)) {
+    throw new Error("You don't teach this subject.");
   }
 
-  return { id: user.id, role: membership.role as SpaceRole };
+  return { id: user.id, role: assignment.role as SubjectRole };
 }

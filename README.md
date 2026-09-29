@@ -13,92 +13,72 @@ One Supabase project per school, no shared tables, no `org_id`. A teacher
 can edit their notes however they like — there's no other school's copy
 to affect (plan section 6).
 
-## Curriculum structure (school_app-style, optional)
+## Curriculum, classes and levels (0020)
 
-A `space` can now optionally carry the same grouping school_app uses for
-`curriculum_topics`: `subject_id` + `education_level` (`primary`/`jss`/
-`sss`) + `level_number` + `academic_year` + `term`. A unique index
-prevents two spaces existing for the same subject+level+year+term. A
-topic can carry an optional `week_number` for labeling/ordering — the
-same idea as school_app's week-of-term grid, but display-only; the
-actual visibility gate is still `topic_notes.release_at`, not the week
-number, so nothing enforces "don't show week 5 before week 4."
+There is no "space" any more. A **topic** is identified directly by
+`subject_id` + `education_level` (`primary`/`jss`/`sss`) + `level_number` +
+`academic_year` + `term` (+ optional `week_number`), the same grouping
+school_app uses for `curriculum_topics`. **Notes are shared by level**: every
+class at that level (JSS2A, JSS2B, ...) sees the same topics and notes --
+enroll a student in a class once, and they read that class's level.
 
-This is additive, not a replacement: a space without any curriculum
-fields set still works exactly as before (a bare, freely-named
-container). Only `createSpace`/`createTopic` and the admin UI learned
-about the new fields.
+`teacher_subjects` (subject + teacher + `teacher`/`reviewer` role) replaces
+space membership for staff. A teacher edits/reviews notes for the subjects
+they're assigned to, at whatever level(s) that subject is taught; a global
+admin can act on every subject. Manage subjects and their teachers at
+`/dashboard/admin/subjects`; a teacher's own list is at `/dashboard` (redirects
+straight into a subject if they're assigned to exactly one).
 
-## Classes (real roster, shared across subjects)
+`classes` + `class_members` are unchanged in shape, but now do double duty:
+they're the roster admins manage, *and* `education_level`/`level_number` on
+the class is what decides which level's notes its students can read.
+**Promoting** a student is just moving them to a different class
+(`promoteClass` in `lib/actions/notes.ts`, or the "Promote class" panel on a
+class's admin page) -- last year's notes stay on the old level for the next
+cohort, and the student immediately sees the new level's notes, no note data
+is copied or touched.
 
-`classes` + `class_members` (0005 migration) close the remaining gap:
-a class like "JSS2A" is its own entity with its own student roster,
-and a space can optionally link to one via `spaces.class_id`. Every
-student in that class's roster can then read every space tied to it —
-enroll a student once in the class, not once per subject-space.
-
-This changed real RLS, not just the admin UI, because student access
-used to be entirely `space_members` rows. A new `is_space_reader(space_id)`
-function checks *either* a direct `space_members` row *or* class
-membership via `spaces.class_id`, and every read policy that used to
-check `space_members` alone (`spaces_member`, `topics_member`,
-`schedule_slots_member`, and `topic_note_visible()`'s final branch) now
-goes through it. Two page-level bugs this required fixing, worth
-knowing about if you touch this area again:
-- `/dashboard/page.tsx` (the spaces picker) used to only query
-  `space_members` — a class-enrolled student would see an empty list
-  despite being able to read their spaces. It now merges direct
-  memberships with spaces reached via class enrollment.
-- `/dashboard/student/spaces/[spaceId]/page.tsx` used to do its own
-  `space_members` lookup *before* RLS ran, which 404'd a class-enrolled
-  student even though RLS would have let them in. Removed — the page
-  now relies entirely on RLS (the `spaces` select itself) as the gate.
-
-Staff (teacher/reviewer/admin) are unaffected — they're still added to
-a space directly via `space_members`; only student read access flows
-through classes. Manage classes at `/dashboard/admin/classes`; link a
-space to one from that space's own settings page.
-
-Class writes (`createClass`, `addClassMember`, `removeClassMember`,
-`createSubject`) require the global `admin` role (`assertGlobalRole`) and go
-through the admin client; `addClassMember` looks the student up by
-`profiles.email` and rejects non-students. Reads go through RLS:
-`class_members_visible` admits a student's own row, staff of a space tied to
-the class, and (0010) any global admin, so an admin sees rosters for classes
-that have no spaces yet.
+**Term/week visibility** (`topic_released_to_students`, called from
+`is_topic_reader`/`topic_note_visible`): with `settings.current_academic_year`
++ `current_term` set, a student sees every topic from an earlier term or year
+in full, and -- for the current term -- only weeks up to
+`current_school_week()` (driven by `settings.term_start_date`, same as the
+week gate added in 0019). A later term is hidden entirely. Staff and admins
+are never gated. Leaving `current_academic_year`/`current_term` unset falls
+back to the plain week gate alone; leaving `term_start_date` unset too turns
+off all gating. Set these at `/dashboard/admin/timetable` ("Term weeks").
 
 ## School timetable
 
-A school-wide weekly timetable (0011): one **bell schedule** shared by every
-class, and a **class x weekday x period grid** where each lesson is a space
-(the subject), usually a teacher, and an optional room.
+A school-wide weekly timetable (0011, re-keyed to subjects in 0020): one
+**bell schedule** shared by every class, and a **class x weekday x period
+grid** where each lesson is a class + subject + optional teacher + optional
+room.
 
 - **Admin:** `/dashboard/admin/timetable` holds the bell schedule (periods,
-  breaks, and the school time zone, default `Africa/Lagos`) and a link per
+  breaks, school time zone, and the term/week settings above) and a link per
   class; `/dashboard/admin/timetable/[classId]` is the editable grid. Click a
-  cell, choose the space and teacher, save.
+  cell, choose the subject and teacher, save.
 - **Everyone else:** `/dashboard/timetable`, read-only. A teacher gets "My
-  week" (their own lessons, class shown in each cell); a student gets their
-  class's grid; a parent gets their children's classes'. Visibility is RLS,
-  not page logic: a lesson is readable by exactly the people who can read its
-  space (`is_space_reader`), plus admins.
-- **Clashes are enforced by the database**, not just the form: one lesson
-  per class per period, and a teacher can't teach two classes in the same
-  period. Rooms are deliberately not clash-checked (halls, labs and fields
-  are shared). A lesson can't sit in a break period, its space must be linked
-  to its class (set on the space's settings page), and its teacher must be a
-  teacher in that space. Removing a teacher from a space frees their cells.
-- **Bell timer:** Present mode's `BellTimer` now shows the signed-in
-  teacher's lessons for *today in the school's time zone*, so a server in UTC
-  or a laptop with the wrong zone no longer shifts the day or the bell.
-- Weekly and recurring: no term or year dimension, and no substitutions or
-  one-off changes. Edit the grid when the timetable changes.
+  week" (lessons for subjects they teach); a student gets their class's grid;
+  a parent gets their children's classes'. Visibility is RLS: a lesson is
+  readable by staff of its subject, anyone who can read its class
+  (`is_class_reader`), or admins.
+- **Clashes are enforced by the database:** one lesson per class per period,
+  a teacher can't teach two classes in the same period, a lesson can't sit in
+  a break period, and its teacher (if set) must be assigned to that subject
+  (`teacher_subjects`). Unassigning a teacher from a subject frees their
+  cells. Rooms aren't clash-checked (halls, labs and fields are shared).
+- **Bell timer:** Present mode's `BellTimer` shows the signed-in teacher's
+  lessons for *today in the school's time zone*.
+- Weekly and recurring: no substitutions or one-off changes -- edit the grid
+  when the timetable changes.
 
-Replaces the old per-topic `schedule_slots` / `ScheduleSlotManager`. The
-`schedule_slots` table is left in the database (forward-only migrations) but
-nothing reads or writes it; existing slots are not migrated because they
-carry no class or teacher to migrate into. Drop the table in a later
-migration once no deployment needs the data.
+## Announcements
+
+Class-targeted or school-wide only (no space targeting). A teacher can post
+to a class they're timetabled to teach; an admin can post to any class or
+school-wide. See `lib/actions/announcements.ts`.
 
 ## What's ported and working (module-wise)
 
@@ -119,9 +99,7 @@ migration once no deployment needs the data.
 ## What's dropped from school_app (intentionally)
 
 - Assessments/quizzes and the assessment-link chip.
-- Education level / term / week gating — replaced by plain space
-  membership + `release_at`.
-- school_app's per-term timetable entries — replaced by the school-level weekly timetable below (no term/year dimension).
+- school_app's per-term timetable entries -- replaced by the school-level weekly timetable below (still no substitutions/one-off changes).
 - Payments (Paystack).
 
 ## Not yet built
@@ -154,12 +132,13 @@ migration once no deployment needs the data.
    `0006_admin_accounts.sql`). Sign in as them, then create every other
    account from `/dashboard/admin/staff`, `/students` and `/parents`; each
    gets a one-time temporary password and must change it on first login.
-5. Create a class at `/dashboard/admin/classes`, add students to its roster
-   by email, then create a space at `/dashboard/admin/spaces` and link it to
-   the class from the space's settings.
-6. Set up the bell schedule and time zone at `/dashboard/admin/timetable`,
-   then fill in each class's grid. A space only appears as a choice for a
-   class once it is linked to that class (step 5).
+5. Create a class at `/dashboard/admin/classes` (set its education level and
+   level number so its students see the right notes), add students to its
+   roster by email, then create a subject at `/dashboard/admin/subjects` and
+   assign teachers to it.
+6. Set up the bell schedule, time zone, and (once the term begins) the term
+   start date and current term/year at `/dashboard/admin/timetable`, then
+   fill in each class's grid, choosing a subject and teacher per lesson.
 
 `GET /api/health` reports the latest applied migration for a running
 deployment — useful for checking N schools are all on the same schema
@@ -200,4 +179,4 @@ Not ported: `attendance`, `authGuards`, `csv`, `database`, `fees*`,
 `installments`, `receipt-view`, `report-card`, `validation` — all
 school_app-specific (attendance/fees/report cards don't exist here, and
 `authGuards.test.ts` tests the old global-role `assertRole`, not this
-app's space-scoped `assertSpaceRole`, which has no test yet).
+app's subject-scoped `assertSubjectRole`, which has no test yet).

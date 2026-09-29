@@ -27,8 +27,7 @@ export type TimetableRow = {
   id: string;
   class_id: string;
   class_name: string;
-  space_id: string;
-  space_name: string;
+  subject_id: string;
   subject_name: string | null;
   teacher_id: string | null;
   teacher_name: string | null;
@@ -159,7 +158,7 @@ export function toBellEntries(rows: TimetableRow[], periods: Period[], weekday: 
           periodNumber: r.period_number,
           startTime: period.start_time,
           endTime: period.end_time,
-          subjectName: r.subject_name ?? r.space_name,
+          subjectName: r.subject_name ?? "",
           className: r.class_name,
         },
       ];

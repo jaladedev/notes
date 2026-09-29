@@ -2,17 +2,17 @@
 
 // Ported from jaladedev/school_app (lib/actions/teacher.ts, lines 557-943)
 // at clone SHA 466c538. Adapted for the standalone, per-school-DB model:
-//   curriculum_topics        -> topics (belongs to a space)
+//   curriculum_topics        -> topics (subject + level + year + term)
 //   teacher_profiles /
-//     subjects_taught, HOD   -> space_members (role: teacher | reviewer | admin)
-//   assertRole(["teacher"])  -> assertSpaceRole (membership-scoped, not global role)
+//     subjects_taught, HOD   -> teacher_subjects (role: teacher | reviewer)
+//   assertRole(["teacher"])  -> assertSubjectRole (subject-scoped, not global role)
 // Versioning, autosave, and the review gate are otherwise unchanged --
 // see the plan doc (notes-delivery-plan.md, section 1) for why they port as-is.
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { assertGlobalRole, assertSpaceRole, requireUser } from "@/lib/actions/authGuards";
+import { assertGlobalRole, assertSubjectRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
@@ -36,12 +36,12 @@ export async function saveTopicNote(
 
   const { data: topic } = await supabase
     .from("topics")
-    .select("space_id")
+    .select("subject_id")
     .eq("id", topicId)
     .single();
   if (!topic) throw new Error("Topic not found.");
 
-  const membership = await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  const membership = await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
   const { data: latest } = await supabase
     .from("topic_notes")
@@ -151,11 +151,11 @@ export async function restoreTopicNoteVersion(topicId: string, versionNoteId: st
 
   const { data: topic } = await supabase
     .from("topics")
-    .select("space_id")
+    .select("subject_id")
     .eq("id", topicId)
     .single();
   if (!topic) throw new Error("Topic not found.");
-  await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
   const { data: version, error: versionError } = await supabase
     .from("topic_notes")
@@ -183,11 +183,11 @@ export async function deleteTopicNoteVersion(topicId: string, versionNoteId: str
 
   const { data: topic } = await supabase
     .from("topics")
-    .select("space_id")
+    .select("subject_id")
     .eq("id", topicId)
     .single();
   if (!topic) throw new Error("Topic not found.");
-  await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
   const { data: target, error: targetError } = await supabase
     .from("topic_notes")
@@ -459,16 +459,17 @@ export async function promoteClass(
   });
 }
 
-export async function createSubject(name: string) {
-  // Fixed: same requireUser()-only gap as createClass/addClassMember
-  // above -- any signed-in account could create subjects.
+export async function createSubject(
+  ...args: Parameters<typeof createSubjectImpl>
+): Promise<ActionResult<{ id: string; name: string }>> {
+  return toResult(() => createSubjectImpl(...args));
+}
+
+async function createSubjectImpl(name: string) {
   await assertGlobalRole(["admin"], "Only an admin can create a subject.");
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Give the subject a name.");
 
-  // Admin client, not the RLS-scoped one: subjects are low-sensitivity
-  // shared catalog data with no per-row ownership to check against, so
-  // assertGlobalRole above is the real (and only) gate.
   const admin = createAdminClient();
   const { data: subject, error } = await admin
     .from("subjects")
@@ -476,160 +477,78 @@ export async function createSubject(name: string) {
     .select("id, name")
     .single();
   if (error) throwDbError(error);
-  revalidatePath("/dashboard/admin/spaces");
+  revalidatePath("/dashboard/admin/subjects");
   return subject;
 }
 
-/**
- * Space name is now optional if a curriculum slot is given -- it
- * defaults to "<Subject> <Level><LevelNumber>" (e.g. "Basic Science
- * JSS2"), same idea as school_app deriving a display label from
- * subject+level+level_number rather than a teacher typing it by hand
- * every time.
- */
-export async function createSpace(name: string, slot: CurriculumSlot = {}) {
-  const { id: userId } = await requireUser();
-  const supabase = createClient();
-
-  let displayName = name.trim();
-  if (!displayName && slot.subjectId) {
-    const { data: subject } = await supabase
-      .from("subjects")
-      .select("name")
-      .eq("id", slot.subjectId)
-      .single();
-    displayName = [subject?.name, slot.educationLevel, slot.levelNumber]
-      .filter(Boolean)
-      .join(" ");
-  }
-  if (!displayName) throw new Error("Give the space a name, or fill in the curriculum fields.");
-
-  const { data: space, error } = await supabase
-    .from("spaces")
-    .insert({
-      name: displayName,
-      subject_id: slot.subjectId ?? null,
-      education_level: slot.educationLevel ?? null,
-      level_number: slot.levelNumber ?? null,
-      academic_year: slot.academicYear ?? null,
-      term: slot.term ?? null,
-      class_id: slot.classId ?? null,
-    })
-    .select("id")
-    .single();
-  if (error) {
-    if (error.code === "23505") {
-      throw new Error(
-        "A space already exists for that subject, level, year, and term. Open it instead of creating another."
-      );
-    }
-    throwDbError(error);
-  }
-
-  // Creator becomes the space's first admin -- otherwise a freshly
-  // created space would have no members at all and be invisible to
-  // its own creator under RLS.
-  const { error: memberError } = await supabase
-    .from("space_members")
-    .insert({ space_id: space.id, profile_id: userId, role: "admin" });
-  if (memberError) throwDbError(memberError);
-
-  revalidatePath("/dashboard/admin/spaces");
-  return space;
-}
-
-export async function setSpaceClass(spaceId: string, classId: string | null) {
-  await assertSpaceRole(spaceId, ["admin"]);
-  const supabase = createClient();
-  const { error } = await supabase.from("spaces").update({ class_id: classId }).eq("id", spaceId);
-  if (error) throwDbError(error);
-  revalidatePath(`/dashboard/admin/spaces/${spaceId}`);
-}
-
-export async function renameSpace(spaceId: string, name: string) {
-  await assertSpaceRole(spaceId, ["admin"]);
-  const trimmed = name.trim();
-  if (!trimmed) throw new Error("Give the space a name.");
-
-  const supabase = createClient();
-  const { error } = await supabase.from("spaces").update({ name: trimmed }).eq("id", spaceId);
-  if (error) throwDbError(error);
-  revalidatePath("/dashboard/admin/spaces");
-  revalidatePath(`/dashboard/admin/spaces/${spaceId}`);
-}
-
-export async function deleteSpace(spaceId: string) {
-  await assertSpaceRole(spaceId, ["admin"]);
-  const supabase = createClient();
-  const { error } = await supabase.from("spaces").delete().eq("id", spaceId);
-  if (error) throwDbError(error);
-  revalidatePath("/dashboard/admin/spaces");
-}
-
-export async function addSpaceMember(
-  spaceId: string,
-  profileEmail: string,
-  role: "teacher" | "reviewer" | "admin" | "student"
+export async function assignTeacherToSubject(
+  subjectId: string,
+  teacherEmail: string,
+  role: "teacher" | "reviewer" = "teacher"
 ) {
-  await assertSpaceRole(spaceId, ["admin"]);
+  await assertGlobalRole(["admin"], "Only an admin can assign a teacher to a subject.");
 
-  // Fixed: was using admin.auth.admin.listUsers(), which only returns
-  // one page of accounts by default -- the email match would silently
-  // fail once the school had enough accounts to paginate. Also had no
-  // check that the matched account's global role made sense for the
-  // space role being assigned (a parent could have been added as a
-  // space "teacher"). Both fixed the same way as addClassMember.
   const admin = createAdminClient();
   const { data: match, error: lookupError } = await admin
     .from("profiles")
     .select("id, role")
-    .eq("email", profileEmail.trim().toLowerCase())
+    .eq("email", teacherEmail.trim().toLowerCase())
     .maybeSingle();
   if (lookupError) throwDbError(lookupError);
-  if (!match) throw new Error(`No account found for ${profileEmail}. Check the email is correct.`);
-
-  const wantsStudent = role === "student";
-  const matchIsStudent = match.role === "student";
-  if (wantsStudent !== matchIsStudent) {
-    throw new Error(
-      wantsStudent
-        ? `${profileEmail} is a ${match.role}, not a student.`
-        : `${profileEmail} is a student -- students join a space as "student", not "${role}".`
-    );
+  if (!match) throw new Error(`No account found for ${teacherEmail}.`);
+  if (match.role !== "teacher") {
+    throw new Error(`${teacherEmail} is a ${match.role}, not a teacher.`);
   }
 
-  // Was via the RLS-scoped client, matching space_members having no
-  // write policy for an existing space admin at all (fixed alongside
-  // this in 0009_fix_space_members_recursion.sql: space_members_write_by_space_admin).
   const { error } = await admin
-    .from("space_members")
-    .upsert({ space_id: spaceId, profile_id: match.id, role }, { onConflict: "space_id,profile_id" });
+    .from("teacher_subjects")
+    .upsert({ subject_id: subjectId, profile_id: match.id, role }, { onConflict: "subject_id,profile_id" });
   if (error) throwDbError(error);
-  revalidatePath(`/dashboard/admin/spaces/${spaceId}`);
+  revalidatePath(`/dashboard/admin/subjects/${subjectId}`);
 }
 
-export async function removeSpaceMember(spaceId: string, profileId: string) {
-  await assertSpaceRole(spaceId, ["admin"]);
+export async function removeTeacherFromSubject(subjectId: string, profileId: string) {
+  await assertGlobalRole(["admin"], "Only an admin can manage subject assignments.");
   const admin = createAdminClient();
   const { error } = await admin
-    .from("space_members")
+    .from("teacher_subjects")
     .delete()
-    .eq("space_id", spaceId)
+    .eq("subject_id", subjectId)
     .eq("profile_id", profileId);
   if (error) throwDbError(error);
-  revalidatePath(`/dashboard/admin/spaces/${spaceId}`);
+  revalidatePath(`/dashboard/admin/subjects/${subjectId}`);
 }
 
-export async function createTopic(spaceId: string, title: string, weekNumber?: number) {
-  await assertSpaceRole(spaceId, ["teacher", "reviewer", "admin"]);
-  const trimmed = title.trim();
+/**
+ * A topic is identified by subject + level + academic year + term (+
+ * optional week number) -- notes are shared by every class at that level
+ * (JSS2A and JSS2B both see "JSS2 Mathematics"), matching school_app's
+ * curriculum_topics grouping. There is no per-class or per-space concept
+ * left: a class only determines which level's topics a student can read
+ * (via class_members -> classes.education_level/level_number).
+ */
+export async function createTopic(input: {
+  subjectId: string;
+  title: string;
+  educationLevel: EducationLevel;
+  levelNumber: number;
+  academicYear: string;
+  term: 1 | 2 | 3;
+  weekNumber?: number;
+}) {
+  await assertSubjectRole(input.subjectId, ["teacher", "reviewer"]);
+  const trimmed = input.title.trim();
   if (!trimmed) throw new Error("Give the topic a title.");
 
   const supabase = createClient();
   const { data: latest } = await supabase
     .from("topics")
     .select("sequence_order")
-    .eq("space_id", spaceId)
+    .eq("subject_id", input.subjectId)
+    .eq("education_level", input.educationLevel)
+    .eq("level_number", input.levelNumber)
+    .eq("academic_year", input.academicYear)
+    .eq("term", input.term)
     .order("sequence_order", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -637,47 +556,47 @@ export async function createTopic(spaceId: string, title: string, weekNumber?: n
   const { data: topic, error } = await supabase
     .from("topics")
     .insert({
-      space_id: spaceId,
+      subject_id: input.subjectId,
       title: trimmed,
-      week_number: weekNumber ?? null,
+      education_level: input.educationLevel,
+      level_number: input.levelNumber,
+      academic_year: input.academicYear,
+      term: input.term,
+      week_number: input.weekNumber ?? null,
       sequence_order: (latest?.sequence_order ?? 0) + 1,
     })
     .select("id")
     .single();
   if (error) throwDbError(error);
 
-  revalidatePath(`/dashboard/teacher/spaces/${spaceId}`);
+  revalidatePath(`/dashboard/teacher/subjects/${input.subjectId}`);
   return topic;
 }
 
 export async function renameTopic(topicId: string, title: string) {
   const supabase = createClient();
-  const { data: topic } = await supabase.from("topics").select("space_id").eq("id", topicId).single();
+  const { data: topic } = await supabase.from("topics").select("subject_id").eq("id", topicId).single();
   if (!topic) throw new Error("Topic not found.");
-  await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
   const trimmed = title.trim();
   if (!trimmed) throw new Error("Give the topic a title.");
 
   const { error } = await supabase.from("topics").update({ title: trimmed }).eq("id", topicId);
   if (error) throwDbError(error);
-  revalidatePath(`/dashboard/teacher/spaces/${topic.space_id}`);
+  revalidatePath(`/dashboard/teacher/subjects/${topic.subject_id}`);
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
 }
 
 export async function deleteTopic(topicId: string) {
   const supabase = createClient();
-  const { data: topic } = await supabase.from("topics").select("space_id").eq("id", topicId).single();
+  const { data: topic } = await supabase.from("topics").select("subject_id").eq("id", topicId).single();
   if (!topic) throw new Error("Topic not found.");
-  await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
-  // Resource files aren't cleaned up here (relies on ON DELETE CASCADE
-  // for the rows; storage objects would be orphaned). Fine for v1 --
-  // note the same caveat as the plan doc's storage-isn't-transactional
-  // comments elsewhere.
   const { error } = await supabase.from("topics").delete().eq("id", topicId);
   if (error) throwDbError(error);
-  revalidatePath(`/dashboard/teacher/spaces/${topic.space_id}`);
+  revalidatePath(`/dashboard/teacher/subjects/${topic.subject_id}`);
 }
 
 // ---------- Share links ----------
@@ -707,11 +626,11 @@ export async function createShareLink(
 
   const { data: topic } = await supabase
     .from("topics")
-    .select("space_id")
+    .select("subject_id")
     .eq("id", topicId)
     .single();
   if (!topic) throw new Error("Topic not found.");
-  await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
   const token = generateShareToken();
   const { data: link, error } = await supabase
@@ -735,11 +654,11 @@ export async function revokeShareLink(linkId: string) {
   const supabase = createClient();
   const { data: link } = await supabase
     .from("share_links")
-    .select("id, topic_id, topics(space_id)")
+    .select("id, topic_id, topics(subject_id)")
     .eq("id", linkId)
     .single();
   if (!link) throw new Error("Link not found.");
-  await assertSpaceRole((link as any).topics.space_id, ["teacher", "reviewer", "admin"]);
+  await assertSubjectRole((link as any).topics.subject_id, ["teacher", "reviewer"]);
 
   const { error } = await supabase.from("share_links").delete().eq("id", linkId);
   if (error) throwDbError(error);
@@ -772,7 +691,7 @@ export async function resolveShareLink(token: string, accessCode?: string) {
 
   const { data: topic } = await admin
     .from("topics")
-    .select("id, title, week_number")
+    .select("id, title, academic_year, term, week_number")
     .eq("id", link.topic_id)
     .single();
   if (!topic) return { error: "not_found" as const };
@@ -792,13 +711,15 @@ export async function resolveShareLink(token: string, accessCode?: string) {
     return { error: "not_found" as const };
   }
 
-  // Same week gate as topic_note_visible(): a topic for a future week
-  // isn't shareable yet. Null week/term start means no gate.
-  if (topic.week_number != null) {
-    const { data: currentWeek } = await admin.rpc("current_school_week");
-    if (typeof currentWeek === "number" && topic.week_number > currentWeek) {
-      return { error: "not_found" as const };
-    }
+  // Same term/week gate as topic_note_visible(): a topic for a future
+  // week or term isn't shareable yet. See 0020's topic_released_to_students.
+  const { data: released } = await admin.rpc("topic_released_to_students", {
+    t_academic_year: topic.academic_year,
+    t_term: topic.term,
+    t_week_number: topic.week_number,
+  });
+  if (released === false) {
+    return { error: "not_found" as const };
   }
 
   const { data: resources } = await admin

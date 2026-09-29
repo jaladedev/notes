@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { assertSpaceRole, requireUser } from "@/lib/actions/authGuards";
+import { assertSubjectRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
 
@@ -13,10 +13,10 @@ export async function createHomework(input: {
   dueAt?: string;
 }) {
   const supabase = createClient();
-  const { data: topic } = await supabase.from("topics").select("space_id").eq("id", input.topicId).single();
+  const { data: topic } = await supabase.from("topics").select("subject_id").eq("id", input.topicId).single();
   if (!topic) throw new Error("Topic not found.");
 
-  const { id: userId } = await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  const { id: userId } = await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
   const { error } = await supabase.from("homework").insert({
     topic_id: input.topicId,
@@ -69,7 +69,7 @@ export async function gradeHomeworkSubmission(input: {
   const supabase = createClient();
 
   // RLS (homework_submissions_own) already restricts this update to the
-  // owning space's staff -- no separate assertSpaceRole call needed here.
+  // owning subject.s staff -- no separate assertSubjectRole call needed here.
   const { error } = await supabase
     .from("homework_submissions")
     .update({

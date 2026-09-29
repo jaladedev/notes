@@ -58,7 +58,7 @@ export async function getTimetable(
 
   let query = supabase
     .from("timetable_entries")
-    .select("id, class_id, space_id, weekday, period_number, teacher_id, room");
+    .select("id, class_id, subject_id, weekday, period_number, teacher_id, room");
   if (filter.classId) query = query.eq("class_id", filter.classId);
   if (filter.teacherId) query = query.eq("teacher_id", filter.teacherId);
   if (filter.weekday) query = query.eq("weekday", filter.weekday);
@@ -67,12 +67,12 @@ export async function getTimetable(
   if (!entries || entries.length === 0) return { periods, rows: [] };
 
   const classIds = [...new Set(entries.map((e) => e.class_id as string))];
-  const spaceIds = [...new Set(entries.map((e) => e.space_id as string))];
+  const subjectIds = [...new Set(entries.map((e) => e.subject_id as string))];
   const teacherIds = [...new Set(entries.map((e) => e.teacher_id as string | null).filter((id): id is string => !!id))];
 
-  const [{ data: classes }, { data: spaces }] = await Promise.all([
+  const [{ data: classes }, { data: subjects }] = await Promise.all([
     supabase.from("classes").select("id, name").in("id", classIds),
-    supabase.from("spaces").select("id, name, subjects(name)").in("id", spaceIds),
+    supabase.from("subjects").select("id, name").in("id", subjectIds),
   ]);
 
   const teacherNames = new Map<string, string>();
@@ -83,17 +83,14 @@ export async function getTimetable(
   }
 
   const className = new Map((classes ?? []).map((c) => [c.id as string, c.name as string]));
-  const spaceInfo = new Map(
-    (spaces ?? []).map((s: any) => [s.id as string, { name: s.name as string, subject: (s.subjects?.name ?? null) as string | null }])
-  );
+  const subjectName = new Map((subjects ?? []).map((s) => [s.id as string, s.name as string]));
 
   const rows: TimetableRow[] = entries.map((e) => ({
     id: e.id,
     class_id: e.class_id,
     class_name: className.get(e.class_id) ?? "",
-    space_id: e.space_id,
-    space_name: spaceInfo.get(e.space_id)?.name ?? "",
-    subject_name: spaceInfo.get(e.space_id)?.subject ?? null,
+    subject_id: e.subject_id,
+    subject_name: subjectName.get(e.subject_id) ?? null,
     teacher_id: e.teacher_id,
     teacher_name: e.teacher_id ? teacherNames.get(e.teacher_id) ?? null : null,
     weekday: e.weekday,
@@ -239,7 +236,7 @@ export async function setTimetableEntry(input: {
   classId: string;
   weekday: number;
   periodNumber: number;
-  spaceId: string;
+  subjectId: string;
   teacherId?: string | null;
   room?: string | null;
 }) {
@@ -261,24 +258,21 @@ export async function setTimetableEntry(input: {
   if (period.is_break) throw new Error("That period is a break, so it can't hold a lesson.");
 
   // These pre-checks exist to give a specific message; the schema enforces
-  // every one of them again (composite FK, guard trigger, unique indexes),
-  // so a race can't produce a bad row, only a less friendly error.
-  const { data: space } = await supabase.from("spaces").select("id, class_id").eq("id", input.spaceId).maybeSingle();
-  if (!space) throw new Error("That space doesn't exist.");
-  if (space.class_id !== input.classId) {
-    throw new Error("That space isn't linked to this class. Link it from the space's settings first.");
-  }
+  // every one of them again (guard trigger, unique indexes), so a race
+  // can't produce a bad row, only a less friendly error.
+  const { data: subject } = await supabase.from("subjects").select("id").eq("id", input.subjectId).maybeSingle();
+  if (!subject) throw new Error("That subject doesn't exist.");
 
   const teacherId = input.teacherId || null;
   if (teacherId) {
-    const { data: member } = await supabase
-      .from("space_members")
+    const { data: assignment } = await supabase
+      .from("teacher_subjects")
       .select("role")
-      .eq("space_id", input.spaceId)
+      .eq("subject_id", input.subjectId)
       .eq("profile_id", teacherId)
       .maybeSingle();
-    if (!member || !["teacher", "admin"].includes(member.role)) {
-      throw new Error("That person isn't a teacher in this space. Add them to the space first.");
+    if (!assignment) {
+      throw new Error("That person isn't assigned to this subject. Assign them to the subject first.");
     }
 
     const { data: clash } = await supabase
@@ -305,7 +299,7 @@ export async function setTimetableEntry(input: {
     .upsert(
       {
         class_id: input.classId,
-        space_id: input.spaceId,
+        subject_id: input.subjectId,
         weekday: input.weekday,
         period_number: input.periodNumber,
         teacher_id: teacherId,
@@ -322,7 +316,7 @@ export async function setTimetableEntry(input: {
     action: "timetable.entry_set",
     targetType: "timetable_entry",
     targetId: saved!.id,
-    metadata: { classId: input.classId, weekday: input.weekday, periodNumber: input.periodNumber, spaceId: input.spaceId },
+    metadata: { classId: input.classId, weekday: input.weekday, periodNumber: input.periodNumber, subjectId: input.subjectId },
   });
   revalidateTimetable(input.classId);
 }

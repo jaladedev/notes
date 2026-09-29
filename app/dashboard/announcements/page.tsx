@@ -1,7 +1,7 @@
 // One board for every announcement the signed-in user can see: RLS
-// (announcements_visible) already covers school-wide, class-targeted
-// (including a parent reading via their child's class), and
-// space-targeted rows, so this page just lists what comes back.
+// (announcements_visible) covers school-wide and class-targeted
+// (including a parent reading via their child's class), so this page
+// just lists what comes back.
 
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
@@ -16,17 +16,26 @@ export default async function AnnouncementsPage() {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
   const isAdmin = profile?.role === "admin";
 
-  const { data: staffSpaces } = await supabase
-    .from("space_members")
-    .select("spaces(id, name)")
-    .eq("profile_id", userId)
-    .in("role", ["teacher", "reviewer", "admin"]);
+  // Classes this teacher is timetabled to teach (teaches_class()) -- the
+  // same set the announcements_write_staff RLS policy checks.
+  const { data: taughtEntries } = await supabase
+    .from("timetable_entries")
+    .select("classes(id, name)")
+    .eq("teacher_id", userId);
+  const seen = new Set<string>();
+  const taughtClasses = (taughtEntries ?? [])
+    .map((e: any) => e.classes)
+    .filter((c: any) => {
+      if (!c || seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
+    });
 
-  const canPost = isAdmin || (staffSpaces && staffSpaces.length > 0);
+  const canPost = isAdmin || taughtClasses.length > 0;
 
   const { data: announcements } = await supabase
     .from("announcements")
-    .select("id, title, body, created_at, spaces(name), classes(name)")
+    .select("id, title, body, created_at, classes(name)")
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -37,21 +46,14 @@ export default async function AnnouncementsPage() {
       <Breadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Announcements" }]} />
       <h1 className="font-display text-xl font-semibold text-ink">Announcements</h1>
 
-      {canPost && (
-        <CreateAnnouncementForm
-          isAdmin={isAdmin}
-          spaces={(staffSpaces ?? []).map((m: any) => m.spaces).filter(Boolean)}
-        />
-      )}
+      {canPost && <CreateAnnouncementForm isAdmin={isAdmin} classes={taughtClasses} />}
 
       <ul className="space-y-3">
         {(announcements ?? []).map((a: any) => (
           <li key={a.id} className="rounded-xl border border-rule bg-white p-4">
             <div className="mb-1 flex items-center justify-between">
               <h3 className="font-display text-sm font-semibold text-ink">{a.title}</h3>
-              <span className="text-xs text-ink-soft">
-                {a.spaces?.name ?? a.classes?.name ?? "School-wide"}
-              </span>
+              <span className="text-xs text-ink-soft">{a.classes?.name ?? "School-wide"}</span>
             </div>
             <p className="whitespace-pre-wrap text-sm text-ink">{a.body}</p>
             <p className="mt-2 text-xs text-ink-soft">{new Date(a.created_at).toLocaleString()}</p>

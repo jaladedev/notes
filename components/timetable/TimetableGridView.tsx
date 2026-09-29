@@ -78,7 +78,7 @@ export function TimetableGridView({
                     ) : (
                       lessons.map((l) => (
                         <span key={l.id} className="block">
-                          <span className="block font-medium text-ink">{l.subject_name ?? l.space_name}</span>
+                          <span className="block font-medium text-ink">{l.subject_name}</span>
                           <span className="block text-xs text-ink-soft">
                             {showClass ? l.class_name : (l.teacher_name ?? "No teacher")}
                             {l.room ? ` · ${l.room}` : ""}

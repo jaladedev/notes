@@ -6,7 +6,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { assertSpaceRole, requireUser } from "@/lib/actions/authGuards";
+import { assertSubjectRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
@@ -18,9 +18,9 @@ export async function createQuizWithQuestions(input: {
   questions: { prompt: string; points?: number; options: { label: string; isCorrect: boolean }[] }[];
 }) {
   const supabase = createClient();
-  const { data: topic } = await supabase.from("topics").select("space_id").eq("id", input.topicId).single();
+  const { data: topic } = await supabase.from("topics").select("subject_id").eq("id", input.topicId).single();
   if (!topic) throw new Error("Topic not found.");
-  const { id: userId } = await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  const { id: userId } = await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
   const { data: quiz, error: quizError } = await supabase
     .from("quizzes")

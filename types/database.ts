@@ -37,18 +37,16 @@ export type Database = {
   public: {
     Tables: Record<
       | "profiles"
-      | "spaces"
-      | "space_members"
       | "classes"
       | "class_members"
       | "subjects"
+      | "teacher_subjects"
       | "topics"
       | "topic_notes"
       | "topic_note_drafts"
       | "topic_resources"
       | "topic_reads"
       | "share_links"
-      | "schedule_slots"
       | "timetable_periods"
       | "timetable_entries"
       | "settings"
@@ -77,6 +75,10 @@ export type Database = {
       current_school_week: {
         Args: Record<string, never>;
         Returns: number | null;
+      };
+      topic_released_to_students: {
+        Args: { t_academic_year: string; t_term: number; t_week_number: number | null };
+        Returns: boolean;
       };
       submit_quiz_attempt: {
         Args: { p_attempt_id: string };

@@ -1,19 +1,7 @@
-// Not a port -- school_app's dashboard index redirects straight to
-// `/dashboard/${profile.role}` because role is global per user. This
-// app instead shows a space picker: even with the global `profiles.role`
-// added in 0006_admin_accounts.sql (admin/teacher/student/parent, needed
-// so an admin/parent can act outside any single space), a teacher or
-// student can still belong to several spaces, so landing on one role's
-// dashboard isn't enough -- they need to choose which space first.
-// Skipped entirely once a user only ever belongs to one space (redirects
-// straight there).
-//
-// Extended for classes (0005 migration): a student's spaces now come
-// from two sources -- direct space_members rows (staff, or a student
-// added to one space individually) and spaces reached via a class
-// they're enrolled in. Both are merged into one list here; missing
-// this merge would mean a class-enrolled student never sees their
-// spaces at all despite RLS correctly letting them read the notes.
+// Rebuilt for the subject/level model (0020): there is no "space" to pick
+// between any more. A teacher/reviewer sees the subjects they're assigned
+// to (teacher_subjects); a student's notes live at a single URL for their
+// class's level, so they're sent straight there.
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -21,8 +9,6 @@ import Link from "next/link";
 import { getNavBadgeCounts } from "@/lib/actions/notifications";
 import { NavBadge } from "@/components/NavBadge";
 import { requireUser } from "@/lib/actions/authGuards";
-
-type SpaceEntry = { id: string; name: string; role: string };
 
 export default async function DashboardIndex() {
   const { id: userId } = await requireUser();
@@ -37,108 +23,83 @@ export default async function DashboardIndex() {
   if (profile?.role === "parent") redirect("/dashboard/parent");
   const { messages: unreadMessages, announcements: unreadAnnouncements } = await getNavBadgeCounts();
 
-  const { data: directMemberships } = await supabase
-    .from("space_members")
-    .select("role, spaces(id, name)")
-    .eq("profile_id", userId);
-
-  const { data: classMemberships } = await supabase
-    .from("class_members")
-    .select("classes(id)")
-    .eq("profile_id", userId);
-
-  const classIds = (classMemberships ?? []).map((c: any) => c.classes?.id).filter(Boolean);
-  const { data: classSpaces } = classIds.length
-    ? await supabase.from("spaces").select("id, name").in("class_id", classIds)
-    : { data: [] };
-
-  const byId = new Map<string, SpaceEntry>();
-  for (const m of directMemberships ?? []) {
-    const s = (m as any).spaces;
-    if (s) byId.set(s.id, { id: s.id, name: s.name, role: m.role });
+  if (profile?.role === "student") {
+    const { data: membership } = await supabase
+      .from("class_members")
+      .select("classes(education_level, level_number)")
+      .eq("profile_id", userId)
+      .maybeSingle();
+    const klass = (membership as any)?.classes;
+    if (klass?.education_level && klass?.level_number) {
+      redirect(`/dashboard/student/levels/${klass.education_level}/${klass.level_number}`);
+    }
   }
-  for (const s of classSpaces ?? []) {
-    if (!byId.has(s.id)) byId.set(s.id, { id: s.id, name: s.name, role: "student" });
-  }
-  const entries = [...byId.values()];
 
-  if (entries.length === 0) {
+  const { data: subjectAssignments } = await supabase
+    .from("teacher_subjects")
+    .select("role, subjects(id, name)")
+    .eq("profile_id", userId);
+  const subjects = (subjectAssignments ?? [])
+    .map((a: any) => a.subjects)
+    .filter(Boolean);
+
+  if (!isAdmin && subjects.length === 1) {
+    redirect(`/dashboard/teacher/subjects/${subjects[0].id}`);
+  }
+
+  const navLinks = (
+    <div className="mb-4 flex flex-wrap gap-2">
+      <Link href="/dashboard/announcements" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">
+        Announcements
+        <NavBadge count={unreadAnnouncements} />
+      </Link>
+      <Link href="/dashboard/messages" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">
+        Messages
+        <NavBadge count={unreadMessages} />
+      </Link>
+      <Link href="/dashboard/timetable" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Timetable</Link>
+      <Link href="/dashboard/search" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Search</Link>
+    </div>
+  );
+
+  const adminLinks = isAdmin && (
+    <div className="mb-6 flex flex-wrap gap-2">
+      <Link href="/dashboard/admin/staff" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Staff</Link>
+      <Link href="/dashboard/admin/students" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Students</Link>
+      <Link href="/dashboard/admin/parents" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Parents</Link>
+      <Link href="/dashboard/admin/classes" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Classes</Link>
+      <Link href="/dashboard/admin/subjects" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Subjects</Link>
+      <Link href="/dashboard/admin/timetable" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Timetable</Link>
+      <Link href="/dashboard/admin/audit-log" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Audit log</Link>
+    </div>
+  );
+
+  if (subjects.length === 0) {
     return (
       <div className="mx-auto max-w-md p-8 text-center">
-        {isAdmin && (
-          <div className="mb-6 flex flex-wrap justify-center gap-2">
-            <Link href="/dashboard/admin/staff" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Staff</Link>
-            <Link href="/dashboard/admin/students" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Students</Link>
-            <Link href="/dashboard/admin/parents" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Parents</Link>
-            <Link href="/dashboard/admin/classes" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Classes</Link>
-            <Link href="/dashboard/admin/spaces" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Spaces</Link>
-            <Link href="/dashboard/admin/audit-log" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Audit log</Link>
-          </div>
-        )}
-        <div className="mb-4 flex flex-wrap justify-center gap-2">
-          <Link href="/dashboard/announcements" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">
-            Announcements
-            <NavBadge count={unreadAnnouncements} />
-          </Link>
-          <Link href="/dashboard/messages" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">
-            Messages
-            <NavBadge count={unreadMessages} />
-          </Link>
-          <Link href="/dashboard/timetable" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Timetable</Link>
-          <Link href="/dashboard/search" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Search</Link>
-        </div>
+        {adminLinks}
+        {navLinks}
         <p className="text-ink">
-          You&apos;re signed in, but not a member of any space or class yet.
-          {isAdmin ? " Create a class, space, or account above." : " Ask an admin to add you."}
+          You&apos;re signed in, but not assigned to any subject yet.
+          {isAdmin ? " Create a subject and assign teachers above." : " Ask an admin to assign you to one."}
         </p>
       </div>
     );
   }
 
-  if (entries.length === 1) {
-    const e = entries[0];
-    const base = e.role === "student" ? "/dashboard/student/spaces" : "/dashboard/teacher/spaces";
-    redirect(`${base}/${e.id}`);
-  }
-
   return (
     <div className="mx-auto max-w-lg p-6">
-      {isAdmin && (
-        <div className="mb-6 flex flex-wrap gap-2">
-          <Link href="/dashboard/admin/staff" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Staff</Link>
-          <Link href="/dashboard/admin/students" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Students</Link>
-          <Link href="/dashboard/admin/parents" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Parents</Link>
-          <Link href="/dashboard/admin/classes" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Classes</Link>
-          <Link href="/dashboard/admin/spaces" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Spaces</Link>
-          <Link href="/dashboard/admin/audit-log" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Audit log</Link>
-        </div>
-      )}
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Link href="/dashboard/announcements" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">
-          Announcements
-          <NavBadge count={unreadAnnouncements} />
-        </Link>
-        <Link href="/dashboard/messages" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">
-          Messages
-          <NavBadge count={unreadMessages} />
-        </Link>
-        <Link href="/dashboard/timetable" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Timetable</Link>
-        <Link href="/dashboard/search" className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink hover:border-marigold">Search</Link>
-      </div>
-      <h1 className="mb-4 font-display text-xl font-semibold text-ink">Your spaces</h1>
+      {adminLinks}
+      {navLinks}
+      <h1 className="mb-4 font-display text-xl font-semibold text-ink">Your subjects</h1>
       <ul className="space-y-2">
-        {entries.map((e) => (
-          <li key={e.id}>
+        {subjects.map((s: any) => (
+          <li key={s.id}>
             <Link
-              href={
-                e.role === "student"
-                  ? `/dashboard/student/spaces/${e.id}`
-                  : `/dashboard/teacher/spaces/${e.id}`
-              }
+              href={`/dashboard/teacher/subjects/${s.id}`}
               className="block rounded-lg border border-rule bg-white p-3 text-ink hover:border-marigold"
             >
-              {e.name}
-              <span className="ml-2 text-xs uppercase tracking-wide text-ink-soft">{e.role}</span>
+              {s.name}
             </Link>
           </li>
         ))}

@@ -20,7 +20,11 @@ export default async function AdminClassPage({
   await requireUser();
   const supabase = createClient();
 
-  const { data: klass } = await supabase.from("classes").select("id, name").eq("id", classId).single();
+  const { data: klass } = await supabase
+    .from("classes")
+    .select("id, name, education_level, level_number")
+    .eq("id", classId)
+    .single();
   if (!klass) notFound();
 
   const { data: members } = await supabase
@@ -28,10 +32,24 @@ export default async function AdminClassPage({
     .select("profile_id, profiles(full_name)")
     .eq("class_id", classId);
 
-  const { data: spaces } = await supabase
-    .from("spaces")
-    .select("id, name")
-    .eq("class_id", classId);
+  // Subjects with at least one topic at this class's level -- what
+  // students in this class can actually read (notes are shared by level).
+  const { data: levelTopics } =
+    klass.education_level && klass.level_number
+      ? await supabase
+          .from("topics")
+          .select("subject_id, subjects(id, name)")
+          .eq("education_level", klass.education_level)
+          .eq("level_number", klass.level_number)
+      : { data: [] };
+  const seenSubjects = new Set<string>();
+  const subjects = (levelTopics ?? [])
+    .map((t: any) => t.subjects)
+    .filter((s: any) => {
+      if (!s || seenSubjects.has(s.id)) return false;
+      seenSubjects.add(s.id);
+      return true;
+    });
 
   const { data: otherClasses } = await supabase
     .from("classes")
@@ -61,22 +79,24 @@ export default async function AdminClassPage({
 
       <section className="rounded-xl border border-rule bg-white p-4">
         <h2 className="mb-3 font-display text-lg font-semibold text-ink">
-          Spaces using this class ({(spaces ?? []).length})
+          Subjects at this level ({subjects.length})
         </h2>
         <ul className="space-y-1">
-          {(spaces ?? []).map((s) => (
+          {subjects.map((s: any) => (
             <li key={s.id}>
               <Link
-                href={`/dashboard/admin/spaces/${s.id}`}
+                href={`/dashboard/admin/subjects/${s.id}`}
                 className="block rounded-md bg-paper px-3 py-1.5 text-sm text-ink hover:underline"
               >
                 {s.name}
               </Link>
             </li>
           ))}
-          {(!spaces || spaces.length === 0) && (
+          {subjects.length === 0 && (
             <p className="text-sm text-ink-soft">
-              No space uses this class yet. Set it from a space&apos;s settings page.
+              {klass.education_level && klass.level_number
+                ? "No subject has any topics at this level yet."
+                : "Set this class's education level and level number to see its subjects."}
             </p>
           )}
         </ul>

@@ -44,7 +44,7 @@ export default async function SearchPage({
               className="block rounded-lg border border-rule bg-white p-3 hover:border-marigold"
             >
               <p className="text-sm font-medium text-ink">{r.topicTitle}</p>
-              <p className="text-xs text-ink-soft">{r.spaceName}</p>
+              <p className="text-xs text-ink-soft">{r.subjectName}</p>
               <p className="mt-1 text-sm text-ink-soft">{r.snippet}</p>
             </Link>
           </li>

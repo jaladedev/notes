@@ -4,7 +4,7 @@
 
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { assertSpaceRole, getAuthenticatedUser } from "@/lib/actions/authGuards";
+import { assertSubjectRole, getAuthenticatedUser } from "@/lib/actions/authGuards";
 import { NoteWorkspace } from "@/components/NoteWorkspace";
 import { NoteVersionDiff } from "@/components/NoteVersionDiff";
 import { RestoreVersionButton } from "@/components/RestoreVersionButton";
@@ -26,12 +26,12 @@ export default async function TeacherNotePage({
 
   const { data: topic } = await supabase
     .from("topics")
-    .select("id, title, space_id, spaces(name)")
+    .select("id, title, subject_id, subjects(name)")
     .eq("id", topicId)
     .single();
   if (!topic) notFound();
 
-  await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
   const { data: latestNote } = await supabase
     .from("topic_notes")
@@ -50,7 +50,7 @@ export default async function TeacherNotePage({
   const { data: otherTopics } = await supabase
     .from("topics")
     .select("id, title")
-    .eq("space_id", topic.space_id)
+    .eq("subject_id", topic.subject_id)
     .neq("id", topicId);
 
   // Bell timer (Present mode): this teacher's own lessons today, by the
@@ -79,8 +79,8 @@ export default async function TeacherNotePage({
     <div className="mx-auto max-w-5xl p-4 sm:p-6">
       <Breadcrumbs
         items={[
-          { label: "Spaces", href: "/dashboard/teacher" },
-          { label: (topic as any).spaces?.name ?? "Space", href: `/dashboard/teacher/spaces/${topic.space_id}` },
+          { label: "Subjects", href: "/dashboard" },
+          { label: (topic as any).subjects?.name ?? "Subject", href: `/dashboard/teacher/subjects/${topic.subject_id}` },
           { label: topic.title },
         ]}
       />
@@ -96,7 +96,7 @@ export default async function TeacherNotePage({
         timeZone={timeZone}
         topicMeta={{
           title: topic.title,
-          subtitle: (topic as any).spaces?.name ?? null,
+          subtitle: (topic as any).subjects?.name ?? null,
         }}
         placeholder="Start writing this lesson's notes…"
       />

@@ -20,7 +20,7 @@ export default async function StudentHomeworkPage({
 
   const { data: topic } = await supabase
     .from("topics")
-    .select("id, title, space_id, spaces(name)")
+    .select("id, title, subject_id, education_level, level_number, subjects(name)")
     .eq("id", topicId)
     .single();
   if (!topic) notFound();
@@ -48,7 +48,7 @@ export default async function StudentHomeworkPage({
         <Breadcrumbs
           items={[
             { label: "Spaces", href: "/dashboard/student" },
-            { label: (topic as any).spaces?.name ?? "Space", href: `/dashboard/student/spaces/${topic.space_id}` },
+            { label: (topic as any).subjects?.name ?? "Subject", href: `/dashboard/student/levels/${topic.education_level}/${topic.level_number}/${topic.subject_id}` },
             { label: topic.title, href: `/dashboard/student/topics/${topicId}` },
             { label: "Homework" },
           ]}

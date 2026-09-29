@@ -3,7 +3,7 @@
 
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { assertSpaceRole } from "@/lib/actions/authGuards";
+import { assertSubjectRole } from "@/lib/actions/authGuards";
 import { CreateHomeworkForm } from "@/components/homework/CreateHomeworkForm";
 import { GradeSubmissionForm } from "@/components/homework/GradeSubmissionForm";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -19,12 +19,12 @@ export default async function TeacherHomeworkPage({
 
   const { data: topic } = await supabase
     .from("topics")
-    .select("id, title, space_id, spaces(name)")
+    .select("id, title, subject_id, subjects(name)")
     .eq("id", topicId)
     .single();
   if (!topic) notFound();
 
-  await assertSpaceRole(topic.space_id, ["teacher", "reviewer", "admin"]);
+  await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
   const { data: assignments } = await supabase
     .from("homework")
@@ -53,8 +53,8 @@ export default async function TeacherHomeworkPage({
       <div>
         <Breadcrumbs
           items={[
-            { label: "Spaces", href: "/dashboard/teacher" },
-            { label: (topic as any).spaces?.name ?? "Space", href: `/dashboard/teacher/spaces/${topic.space_id}` },
+            { label: "Subjects", href: "/dashboard" },
+            { label: (topic as any).subjects?.name ?? "Subject", href: `/dashboard/teacher/subjects/${topic.subject_id}` },
             { label: topic.title, href: `/dashboard/teacher/notes/${topicId}` },
             { label: "Homework" },
           ]}

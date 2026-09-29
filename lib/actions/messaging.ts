@@ -111,40 +111,68 @@ export async function getUnreadMessageCount(): Promise<number> {
 }
 
 /**
- * Contacts the current user is allowed to start a conversation with:
- * anyone sharing a space with them (via space_members, either side), or
- * a parent's linked children's staff. Deliberately narrower than "every
- * profile in the school" -- profiles RLS only lets a user read their
- * own row (plus admin's read-all), so this goes through the admin
+ * Contacts the current user is allowed to start a conversation with: anyone
+ * sharing a subject assignment (teacher_subjects) or a class (class_members,
+ * or a teacher timetabled to that class) with them. Deliberately narrower
+ * than "every profile in the school" -- profiles RLS only lets a user read
+ * their own row (plus admin's read-all), so this goes through the admin
  * client but filters to real relationships rather than exposing every
  * account to every user.
  */
 export async function searchMessageableContacts(query: string) {
   const { id: userId } = await requireUser();
-  // space_members_self only lets a user read their OWN membership row
-  // (or every row if they're a space admin), so listing co-members and
-  // their names needs the admin client -- gated below by "shares a
-  // space with me", not by exposing every profile in the school.
+  // The tables below only let a user read their OWN row (or every row if
+  // they're an admin), so listing co-members and their names needs the
+  // admin client -- gated by "shares a subject/class with me", not by
+  // exposing every profile in the school.
   const admin = createAdminClient();
 
-  const { data: mySpaces } = await admin
-    .from("space_members")
-    .select("space_id")
-    .eq("profile_id", userId);
-  const spaceIds = (mySpaces ?? []).map((s) => s.space_id);
+  const [{ data: mySubjects }, { data: myClasses }, { data: myTaughtClasses }] = await Promise.all([
+    admin.from("teacher_subjects").select("subject_id").eq("profile_id", userId),
+    admin.from("class_members").select("class_id").eq("profile_id", userId),
+    admin.from("timetable_entries").select("class_id").eq("teacher_id", userId),
+  ]);
+  const subjectIds = (mySubjects ?? []).map((s) => s.subject_id);
+  const classIds = [
+    ...new Set([
+      ...(myClasses ?? []).map((c) => c.class_id),
+      ...(myTaughtClasses ?? []).map((c) => c.class_id),
+    ]),
+  ];
 
-  if (spaceIds.length === 0) return [];
-
-  const { data: contacts } = await admin
-    .from("space_members")
-    .select("profile_id, profiles(id, full_name)")
-    .in("space_id", spaceIds)
-    .neq("profile_id", userId);
+  if (subjectIds.length === 0 && classIds.length === 0) return [];
 
   const seen = new Map<string, { id: string; full_name: string }>();
-  for (const c of contacts ?? []) {
-    const p = (c as any).profiles;
-    if (p && !seen.has(p.id)) seen.set(p.id, p);
+
+  if (subjectIds.length > 0) {
+    const { data: subjectMates } = await admin
+      .from("teacher_subjects")
+      .select("profile_id, profiles(id, full_name)")
+      .in("subject_id", subjectIds)
+      .neq("profile_id", userId);
+    for (const c of subjectMates ?? []) {
+      const p = (c as any).profiles;
+      if (p && !seen.has(p.id)) seen.set(p.id, p);
+    }
+  }
+
+  if (classIds.length > 0) {
+    const [{ data: classmates }, { data: classTeachers }] = await Promise.all([
+      admin.from("class_members").select("profile_id, profiles(id, full_name)").in("class_id", classIds),
+      admin
+        .from("timetable_entries")
+        .select("teacher_id, profiles:profiles!timetable_entries_teacher_id_fkey(id, full_name)")
+        .in("class_id", classIds)
+        .not("teacher_id", "is", null),
+    ]);
+    for (const c of classmates ?? []) {
+      const p = (c as any).profiles;
+      if (p && p.id !== userId && !seen.has(p.id)) seen.set(p.id, p);
+    }
+    for (const c of classTeachers ?? []) {
+      const p = (c as any).profiles;
+      if (p && p.id !== userId && !seen.has(p.id)) seen.set(p.id, p);
+    }
   }
 
   const results = [...seen.values()];
