@@ -367,12 +367,9 @@ async function updateClassImpl(
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can edit a class.");
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Give the class a name.");
-  if ((educationLevel === null) !== (levelNumber === null)) {
-    throw new Error("Set both the education level and the level number, or leave both empty.");
-  }
-  if (levelNumber !== null && (!Number.isInteger(levelNumber) || levelNumber < 1 || levelNumber > 6)) {
-    throw new Error("Level number must be between 1 and 6.");
-  }
+  // Same rule as creating a class: a class with no level shows its
+  // students no notes, so editing may change the level but not clear it.
+  assertClassLevel(educationLevel ?? undefined, levelNumber ?? undefined);
 
   const admin = createAdminClient();
   const { error } = await admin

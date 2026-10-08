@@ -23,6 +23,7 @@ export function ClassEditPanel({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  const ready = name.trim() !== "" && level !== "" && levelNumber !== "";
   const dirty =
     name.trim() !== initialName ||
     (level || null) !== initialLevel ||
@@ -76,7 +77,7 @@ export function ClassEditPanel({
             onChange={(e) => setLevel(e.target.value as EducationLevel | "")}
             className="mt-1 block rounded-lg border border-rule bg-white px-2 py-2 text-sm text-ink"
           >
-            <option value="">Not set</option>
+            <option value="" disabled>Choose level</option>
             <option value="primary">Primary</option>
             <option value="jss">JSS</option>
             <option value="sss">SSS</option>
@@ -88,6 +89,7 @@ export function ClassEditPanel({
             type="number"
             min={1}
             max={6}
+            required
             value={levelNumber}
             onChange={(e) => setLevelNumber(e.target.value)}
             className="mt-1 block w-16 rounded-lg border border-rule bg-white px-2 py-2 text-sm text-ink"
@@ -95,14 +97,14 @@ export function ClassEditPanel({
         </label>
         <button
           type="submit"
-          disabled={isPending || !dirty || !name.trim()}
+          disabled={isPending || !dirty || !ready}
           className="rounded-lg bg-marigold px-4 py-2 text-sm font-medium text-ink hover:bg-marigold-dark disabled:opacity-60"
         >
           Save changes
         </button>
       </form>
       <p className="mt-2 text-xs text-ink-soft">
-        Students see the notes for this class&apos;s level, so set both the level and the number.
+        Students see the notes for this class&apos;s level, so every class needs both a level and a number.
       </p>
 
       <div className="mt-4 border-t border-rule pt-3">
