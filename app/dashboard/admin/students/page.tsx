@@ -48,7 +48,12 @@ export default async function AdminStudentsPage() {
               </p>
               <p className="text-xs text-ink-soft">{s.email}</p>
             </div>
-            <AccountActions userId={s.id} email={s.email ?? ""} isActive={s.is_active} />
+            <AccountActions
+              userId={s.id}
+              fullName={s.full_name}
+              email={s.email ?? ""}
+              isActive={s.is_active}
+            />
           </li>
         ))}
         {(!students || students.length === 0) && (

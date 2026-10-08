@@ -303,7 +303,104 @@ async function bulkCreateStudentsImpl(
   return results;
 }
 
-export async function resetUserPassword(userId: string): Promise<{ password: string }> {
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export async function updateAccount(
+  ...args: Parameters<typeof updateAccountImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof updateAccountImpl>>>> {
+  return toResult(() => updateAccountImpl(...args));
+}
+
+/**
+ * Edit a person's name and/or sign-in email. Role is deliberately not
+ * editable here. The email lives in two places with no trigger keeping them
+ * in step (auth.users and profiles.email), so both are written, auth first
+ * (it enforces its own uniqueness); if the profile write then fails the auth
+ * email is put back so the two never disagree.
+ */
+async function updateAccountImpl(input: { userId: string; fullName: string; email: string }) {
+  const admin_ = await assertGlobalRole(["admin"], "Only an admin can edit accounts.");
+  const admin = createAdminClient();
+
+  const fullName = input.fullName.trim();
+  const email = input.email.trim().toLowerCase();
+  if (!fullName) throw new Error("Enter the person's full name.");
+  if (fullName.length > 120) throw new Error("That name is too long (120 characters at most).");
+  if (!EMAIL_PATTERN.test(email)) throw new Error("Enter a valid email address.");
+
+  const { data: current, error: loadError } = await admin
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("id", input.userId)
+    .maybeSingle();
+  if (loadError) throwDbError(loadError);
+  if (!current) throw new Error("That account no longer exists.");
+
+  const previousEmail = current.email ?? "";
+  const nameChanged = fullName !== current.full_name;
+  const emailChanged = email !== previousEmail;
+  if (!nameChanged && !emailChanged) return { changed: false as const };
+
+  if (emailChanged) {
+    const { data: taken } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .neq("id", input.userId)
+      .maybeSingle();
+    if (taken) throw new Error("Another account already uses that email.");
+
+    const { error: authError } = await admin.auth.admin.updateUserById(input.userId, {
+      email,
+      email_confirm: true,
+    });
+    if (authError) {
+      if (authError.code === "email_exists" || /already.*(registered|exists)/i.test(authError.message)) {
+        throw new Error("Another account already uses that email.");
+      }
+      throw new Error(authError.message || "Couldn't change the email.");
+    }
+  }
+
+  const { error: profileError } = await admin
+    .from("profiles")
+    .update({ full_name: fullName, email })
+    .eq("id", input.userId);
+  if (profileError) {
+    if (emailChanged && previousEmail) {
+      await admin.auth.admin
+        .updateUserById(input.userId, { email: previousEmail, email_confirm: true })
+        .catch(() => {
+          // Best-effort revert; the original error below is what matters to the admin.
+        });
+    }
+    throwDbError(profileError);
+  }
+
+  await writeAuditLog({
+    actorId: admin_.id,
+    action: "account.update",
+    targetType: "profile",
+    targetId: input.userId,
+    metadata: {
+      changed: [nameChanged ? "name" : null, emailChanged ? "email" : null].filter(Boolean),
+      ...(emailChanged ? { emailFrom: previousEmail, emailTo: email } : {}),
+    },
+  });
+
+  revalidatePath("/dashboard/admin/staff");
+  revalidatePath("/dashboard/admin/students");
+  revalidatePath("/dashboard/admin/parents");
+  return { changed: true as const };
+}
+
+export async function resetUserPassword(
+  ...args: Parameters<typeof resetUserPasswordImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof resetUserPasswordImpl>>>> {
+  return toResult(() => resetUserPasswordImpl(...args));
+}
+
+async function resetUserPasswordImpl(userId: string): Promise<{ password: string }> {
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can reset a password.");
   const admin = createAdminClient();
 
@@ -333,7 +430,13 @@ export async function resetUserPassword(userId: string): Promise<{ password: str
   return { password: newPassword };
 }
 
-export async function setAccountActive(userId: string, active: boolean) {
+export async function setAccountActive(
+  ...args: Parameters<typeof setAccountActiveImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof setAccountActiveImpl>>>> {
+  return toResult(() => setAccountActiveImpl(...args));
+}
+
+async function setAccountActiveImpl(userId: string, active: boolean) {
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can do that.");
   const admin = createAdminClient();
 

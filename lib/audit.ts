@@ -8,6 +8,7 @@ import { logger } from "@/lib/logger";
 
 type AuditAction =
   | "account.create"
+  | "account.update"
   | "account.deactivate"
   | "account.reactivate"
   | "account.password_reset"

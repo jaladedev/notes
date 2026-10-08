@@ -8,6 +8,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 const ACTION_LABELS: Record<string, string> = {
   "account.create": "Created account",
+  "account.update": "Edited account",
   "account.password_reset": "Reset password",
   "account.deactivate": "Deactivated account",
   "account.reactivate": "Reactivated account",

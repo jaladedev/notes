@@ -307,6 +307,21 @@ export async function createClass(
   return toResult(() => createClassImpl(...args));
 }
 
+// Notes are shared by level (0020), so a class with no level -- or only half
+// of one -- would show its students nothing. The DB has no constraint on
+// these columns, so this is the only guard on the create path.
+function assertClassLevel(educationLevel: EducationLevel | undefined, levelNumber: number | undefined) {
+  if (!educationLevel || levelNumber === undefined) {
+    throw new Error("Choose the education level and level number (for example JSS and 2).");
+  }
+  if (!["primary", "jss", "sss"].includes(educationLevel)) {
+    throw new Error("Level must be primary, jss or sss.");
+  }
+  if (!Number.isInteger(levelNumber) || levelNumber < 1 || levelNumber > 6) {
+    throw new Error("Level number must be a whole number between 1 and 6.");
+  }
+}
+
 async function createClassImpl(name: string, educationLevel?: EducationLevel, levelNumber?: number) {
   // Fixed: this used to only check requireUser() (any signed-in
   // account, including a student, could create classes) -- stale
@@ -318,6 +333,7 @@ async function createClassImpl(name: string, educationLevel?: EducationLevel, le
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can create a class.");
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Give the class a name.");
+  assertClassLevel(educationLevel, levelNumber);
 
   // Still the admin client, not the RLS-scoped one -- classes/class_members
   // have no INSERT policy at all (deliberately: this action, gated by
@@ -325,7 +341,7 @@ async function createClassImpl(name: string, educationLevel?: EducationLevel, le
   const admin = createAdminClient();
   const { data: klass, error } = await admin
     .from("classes")
-    .insert({ name: trimmed, education_level: educationLevel ?? null, level_number: levelNumber ?? null })
+    .insert({ name: trimmed, education_level: educationLevel, level_number: levelNumber })
     .select("id, name")
     .single();
   if (error) throwDbError(error);

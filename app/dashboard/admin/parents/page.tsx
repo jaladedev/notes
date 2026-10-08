@@ -49,7 +49,12 @@ export default async function AdminParentsPage() {
               </p>
               <p className="text-xs text-ink-soft">{p.email}</p>
             </div>
-            <AccountActions userId={p.id} email={p.email ?? ""} isActive={p.is_active} />
+            <AccountActions
+              userId={p.id}
+              fullName={p.full_name}
+              email={p.email ?? ""}
+              isActive={p.is_active}
+            />
           </li>
         ))}
         {(!parents || parents.length === 0) && (
