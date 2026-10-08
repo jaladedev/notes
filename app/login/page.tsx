@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +48,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm rounded-2xl border border-rule bg-paper p-8 shadow-sm">
         <h1 className="mb-1 font-display text-2xl font-semibold text-ink">Welcome back</h1>
         <p className="mb-6 text-sm text-ink-soft">
-          Sign in to view your notes.
+          Sign in to view your notes. Forgot your password? Ask your school admin to reset it.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -58,6 +59,8 @@ export default function LoginPage() {
             <input
               id="email"
               type="email"
+              autoComplete="username"
+              autoFocus
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -71,20 +74,30 @@ export default function LoginPage() {
             <label htmlFor="password" className="mb-1 block text-sm font-medium text-ink">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-rule bg-white px-3 py-2 text-ink outline-none focus-visible:border-marigold"
-              placeholder="••••••••"
-              title="Enter your account password"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-lg border border-rule bg-white py-2 pl-3 pr-16 text-ink outline-none focus-visible:border-marigold"
+                placeholder="Your password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-2 my-auto h-8 rounded px-2 text-sm text-ink-soft hover:text-ink"
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
 
           {error && (
-            <p role="alert" className="text-sm text-clay">
+            <p role="alert" className="rounded-lg bg-clay/10 px-3 py-2 text-sm text-clay">
               {error}
             </p>
           )}
