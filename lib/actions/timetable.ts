@@ -103,7 +103,13 @@ export async function getTimetable(
 
 // ---------- Bell schedule (admin) ----------
 
-export async function saveTimetablePeriod(input: {
+export async function saveTimetablePeriod(
+  ...args: Parameters<typeof saveTimetablePeriodImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof saveTimetablePeriodImpl>>>> {
+  return toResult(() => saveTimetablePeriodImpl(...args));
+}
+
+async function saveTimetablePeriodImpl(input: {
   periodNumber: number;
   label?: string;
   startTime: string;
@@ -164,7 +170,13 @@ export async function saveTimetablePeriod(input: {
   revalidateTimetable();
 }
 
-export async function deleteTimetablePeriod(periodNumber: number) {
+export async function deleteTimetablePeriod(
+  ...args: Parameters<typeof deleteTimetablePeriodImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof deleteTimetablePeriodImpl>>>> {
+  return toResult(() => deleteTimetablePeriodImpl(...args));
+}
+
+async function deleteTimetablePeriodImpl(periodNumber: number) {
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can change the bell schedule.");
   const supabase = createClient();
   const { error } = await supabase.from("timetable_periods").delete().eq("period_number", periodNumber);
@@ -179,7 +191,13 @@ export async function deleteTimetablePeriod(periodNumber: number) {
   revalidateTimetable();
 }
 
-export async function saveSchoolTimeZone(timeZone: string) {
+export async function saveSchoolTimeZone(
+  ...args: Parameters<typeof saveSchoolTimeZoneImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof saveSchoolTimeZoneImpl>>>> {
+  return toResult(() => saveSchoolTimeZoneImpl(...args));
+}
+
+async function saveSchoolTimeZoneImpl(timeZone: string) {
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can change the school time zone.");
   const tz = timeZone.trim();
   if (!isValidTimeZone(tz)) throw new Error("That isn't a valid time zone. Try something like Africa/Lagos.");
@@ -232,7 +250,13 @@ export async function saveTermStartDate(date: string | null): Promise<ActionResu
 
 // ---------- Lessons (admin) ----------
 
-export async function setTimetableEntry(input: {
+export async function setTimetableEntry(
+  ...args: Parameters<typeof setTimetableEntryImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof setTimetableEntryImpl>>>> {
+  return toResult(() => setTimetableEntryImpl(...args));
+}
+
+async function setTimetableEntryImpl(input: {
   classId: string;
   weekday: number;
   periodNumber: number;
@@ -321,7 +345,13 @@ export async function setTimetableEntry(input: {
   revalidateTimetable(input.classId);
 }
 
-export async function clearTimetableEntry(entryId: string, classId: string) {
+export async function clearTimetableEntry(
+  ...args: Parameters<typeof clearTimetableEntryImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof clearTimetableEntryImpl>>>> {
+  return toResult(() => clearTimetableEntryImpl(...args));
+}
+
+async function clearTimetableEntryImpl(entryId: string, classId: string) {
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can edit the timetable.");
   const supabase = createClient();
   const { error } = await supabase.from("timetable_entries").delete().eq("id", entryId);

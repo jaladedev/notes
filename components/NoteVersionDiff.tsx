@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getTopicNoteVersionContent } from "@/lib/actions/notes";
+import { unwrap } from "@/lib/actions/unwrap";
 import { computeWordDiff, stripMarkdownForDiff, type DiffToken } from "@/lib/diff";
 
 type VersionSummary = {
@@ -38,8 +39,10 @@ export function NoteVersionDiff({ versions }: { versions: VersionSummary[] }) {
     setTokens(null);
 
     Promise.all([getTopicNoteVersionContent(fromId), getTopicNoteVersionContent(toId)])
-      .then(([fromContent, toContent]) => {
+      .then(([fromResult, toResult]) => {
         if (cancelled) return;
+        const fromContent = unwrap(fromResult);
+        const toContent = unwrap(toResult);
         setTokens(
           computeWordDiff(stripMarkdownForDiff(fromContent), stripMarkdownForDiff(toContent))
         );

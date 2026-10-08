@@ -27,6 +27,12 @@ import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
  * space+reviewer.
  */
 export async function saveTopicNote(
+  ...args: Parameters<typeof saveTopicNoteImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof saveTopicNoteImpl>>>> {
+  return toResult(() => saveTopicNoteImpl(...args));
+}
+
+async function saveTopicNoteImpl(
   topicId: string,
   content: string,
   status: "draft" | "published"
@@ -134,7 +140,13 @@ export async function clearTopicNoteDraft(topicId: string) {
     .eq("author_id", teacherId);
 }
 
-export async function getTopicNoteVersionContent(noteId: string): Promise<string> {
+export async function getTopicNoteVersionContent(
+  ...args: Parameters<typeof getTopicNoteVersionContentImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof getTopicNoteVersionContentImpl>>>> {
+  return toResult(() => getTopicNoteVersionContentImpl(...args));
+}
+
+async function getTopicNoteVersionContentImpl(noteId: string): Promise<string> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("topic_notes")
@@ -171,7 +183,7 @@ async function restoreTopicNoteVersionImpl(topicId: string, versionNoteId: strin
     .single();
   if (versionError || !version) throw new Error("That version isn't available.");
 
-  return saveTopicNote(topicId, version.content, version.status as "draft" | "published");
+  return saveTopicNoteImpl(topicId, version.content, version.status as "draft" | "published");
 }
 
 /**

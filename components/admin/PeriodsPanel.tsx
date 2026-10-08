@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteTimetablePeriod, saveSchoolTimeZone, saveTimetablePeriod } from "@/lib/actions/timetable";
 import { emitToast } from "@/lib/toast";
+import type { ActionResult } from "@/lib/actions/result";
 import { formatTime, sortPeriods, type Period } from "@/lib/timetable";
 
 export function PeriodsPanel({ periods, timeZone }: { periods: Period[]; timeZone: string }) {
@@ -22,10 +23,14 @@ export function PeriodsPanel({ periods, timeZone }: { periods: Period[]; timeZon
   const [isBreak, setIsBreak] = useState(false);
   const [zone, setZone] = useState(timeZone);
 
-  function run(action: () => Promise<void>, ok: string, fail: string, after?: () => void) {
+  function run(action: () => Promise<ActionResult<unknown>>, ok: string, fail: string, after?: () => void) {
     startTransition(async () => {
       try {
-        await action();
+        const res = await action();
+        if (!res.ok) {
+          emitToast(res.error, "error");
+          return;
+        }
         emitToast(ok, "success");
         after?.();
         router.refresh();

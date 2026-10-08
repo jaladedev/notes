@@ -64,7 +64,7 @@ export function TimetableEditor({
     if (!selected || !subjectId) return;
     startTransition(async () => {
       try {
-        await setTimetableEntry({
+        const res = await setTimetableEntry({
           classId,
           weekday: selected.weekday,
           periodNumber: selected.periodNumber,
@@ -72,6 +72,10 @@ export function TimetableEditor({
           teacherId: teacherId || null,
           room,
         });
+        if (!res.ok) {
+          emitToast(res.error, "error");
+          return;
+        }
         emitToast("Lesson saved.", "success");
         setSelected(null);
         router.refresh();
@@ -85,7 +89,11 @@ export function TimetableEditor({
     if (!existing) return;
     startTransition(async () => {
       try {
-        await clearTimetableEntry(existing.id, classId);
+        const res = await clearTimetableEntry(existing.id, classId);
+        if (!res.ok) {
+          emitToast(res.error, "error");
+          return;
+        }
         emitToast("Lesson removed.", "success");
         setSelected(null);
         router.refresh();

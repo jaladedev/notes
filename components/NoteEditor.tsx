@@ -19,6 +19,7 @@ import { applySectionGrouping } from "@/lib/tiptap/section-node";
 import { slashCommandBridge } from "@/lib/tiptap/slash-command";
 import { buildNoteEditorExtensions } from "@/lib/tiptap/editor-extensions";
 import { saveTopicNote } from "@/lib/actions/notes";
+import { unwrap } from "@/lib/actions/unwrap";
 import {
   createMermaidResource,
   createVideoEmbedResource,
@@ -186,7 +187,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       return { id, createdHere: false };
     }
     const creation = (async () => {
-      const note = await saveTopicNote(topicId, content, status);
+      const note = unwrap(await saveTopicNote(topicId, content, status));
       if (!note?.id) throw new Error("Could not create the note.");
       return note.id;
     })();
@@ -355,7 +356,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const getMarkdown = () => (editor as any)?.storage.markdown.getMarkdown() as string;
 
   const saveDraft = async (content: string) => {
-    await saveTopicNote(topicId, content, "draft");
+    unwrap(await saveTopicNote(topicId, content, "draft"));
     setLastSavedContent(content);
     setIsDirty(false);
   };
@@ -508,12 +509,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           noteId = result.id;
           if (!result.createdHere) {
             if (status === "published") {
-              const note = await saveTopicNote(topicId, content, status);
+              const note = unwrap(await saveTopicNote(topicId, content, status));
               if (note?.id) noteId = note.id;
             }
           }
         } else {
-          const note = await saveTopicNote(topicId, content, status);
+          const note = unwrap(await saveTopicNote(topicId, content, status));
           noteId = note?.id ?? currentNoteId!;
         }
         setCurrentNoteId(noteId);
