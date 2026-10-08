@@ -24,6 +24,16 @@ export default async function AdminSubjectPage({
     .select("profile_id, role, profiles(full_name)")
     .eq("subject_id", subjectId);
 
+  const { data: teacherRows } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("role", "teacher")
+    .eq("is_active", true)
+    .order("full_name");
+  const allTeachers = (teacherRows ?? [])
+    .filter((t: any) => t.email)
+    .map((t: any) => ({ id: t.id, email: t.email, name: t.full_name }));
+
   const { data: topics } = await supabase
     .from("topics")
     .select("id, title, education_level, level_number, academic_year, term, week_number")
@@ -37,7 +47,7 @@ export default async function AdminSubjectPage({
       <Breadcrumbs items={[{ label: "Subjects", href: "/dashboard/admin/subjects" }, { label: subject.name }]} />
       <h1 className="mb-4 font-display text-xl font-semibold text-ink">{subject.name}</h1>
       <div className="space-y-6">
-        <SubjectTeachersPanel subjectId={subjectId} teachers={(teachers ?? []) as any} />
+        <SubjectTeachersPanel subjectId={subjectId} teachers={(teachers ?? []) as any} allTeachers={allTeachers} />
         <SubjectTopicsPanel subjectId={subjectId} topics={topics ?? []} />
       </div>
     </div>
