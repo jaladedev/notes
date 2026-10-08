@@ -75,6 +75,12 @@ export default async function StudentTopicPage({
         >
           Quizzes
         </a>
+        <a
+          href={`/dashboard/student/topics/${topicId}/handout`}
+          className="rounded-lg border border-rule bg-white px-3 py-1.5 text-xs text-ink hover:border-marigold"
+        >
+          Print / Save as PDF
+        </a>
       </div>
       <TopicContent content={note.content} resources={resources ?? []} />
     </div>
