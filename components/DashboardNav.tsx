@@ -1,11 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavBadge } from "@/components/NavBadge";
+import { createClient } from "@/lib/supabase/client";
+import { getNavBadgeCounts } from "@/lib/actions/notifications";
 
-export type NavItem = { label: string; href: string; badge?: number };
+export type NavItem = {
+  label: string;
+  href: string;
+  badge?: number;
+  /** Items with a badgeKey get a live count; `badge` is the server-rendered starting value. */
+  badgeKey?: "messages" | "announcements";
+};
+
+type Counts = { messages: number; announcements: number };
+
+const LIVE_PREFIXES = ["/dashboard/messages", "/dashboard/announcements"];
+const touchesLiveSection = (path: string) => LIVE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
 
 function isActive(pathname: string, href: string) {
   if (href === "/dashboard") return pathname === "/dashboard";
@@ -28,6 +41,80 @@ export function DashboardNav({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // The layout renders once and then persists across client navigations, so
+  // the server-rendered counts go stale (and still count a conversation
+  // you've just opened). Keep them in state and re-fetch when they can change.
+  const serverMessages = items.find((i) => i.badgeKey === "messages")?.badge ?? 0;
+  const serverAnnouncements = items.find((i) => i.badgeKey === "announcements")?.badge ?? 0;
+  const [counts, setCounts] = useState<Counts>({ messages: serverMessages, announcements: serverAnnouncements });
+  useEffect(() => {
+    setCounts({ messages: serverMessages, announcements: serverAnnouncements });
+  }, [serverMessages, serverAnnouncements]);
+
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+  const requestId = useRef(0);
+
+  const refresh = useCallback(async () => {
+    const id = ++requestId.current;
+    try {
+      const next = await getNavBadgeCounts();
+      if (id === requestId.current) setCounts(next); // ignore out-of-order replies
+    } catch {
+      // Keep the last known counts.
+    }
+  }, []);
+
+  // Reading messages / announcements changes the counts: re-fetch when
+  // navigating into or out of those sections.
+  const prevPath = useRef(pathname);
+  useEffect(() => {
+    const before = prevPath.current;
+    prevPath.current = pathname;
+    if (before !== pathname && (touchesLiveSection(before) || touchesLiveSection(pathname))) void refresh();
+  }, [pathname, refresh]);
+
+  // A hard load of a messages/announcements page renders the layout in
+  // parallel with the page's mark-as-read, so correct the count once mounted.
+  useEffect(() => {
+    if (touchesLiveSection(pathnameRef.current)) void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("app:refresh-nav-badges", onVisible);
+    return () => {
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("app:refresh-nav-badges", onVisible);
+    };
+  }, [refresh]);
+
+  // New messages in any of my conversations (Realtime only delivers rows
+  // RLS lets me see). The conversation that's open handles its own
+  // mark-as-read and then asks for a refresh, so skip it here.
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("nav-unread-messages")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        const conversationId = (payload.new as { conversation_id?: string }).conversation_id;
+        if (conversationId && pathnameRef.current === `/dashboard/messages/${conversationId}`) return;
+        void refresh();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refresh]);
+
+  const badgeFor = (item: NavItem) => (item.badgeKey ? counts[item.badgeKey] : item.badge ?? 0);
+  const totalUnread = counts.messages + counts.announcements;
+
   const linkClass = (href: string) =>
     `flex items-center rounded-lg px-3 py-2 text-sm transition ${
       isActive(pathname, href)
@@ -45,7 +132,7 @@ export function DashboardNav({
           className={linkClass(item.href)}
         >
           {item.label}
-          <NavBadge count={item.badge ?? 0} />
+          <NavBadge count={badgeFor(item)} />
         </Link>
       </li>
     ));
@@ -83,6 +170,7 @@ export function DashboardNav({
           className="ml-auto rounded-lg border border-rule bg-white px-3 py-1.5 text-sm text-ink md:hidden"
         >
           {open ? "Close" : "Menu"}
+          {!open && <NavBadge count={totalUnread} />}
         </button>
       </div>
 

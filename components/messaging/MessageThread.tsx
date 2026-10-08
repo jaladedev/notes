@@ -6,7 +6,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { sendMessage } from "@/lib/actions/messaging";
+import { markConversationRead, sendMessage } from "@/lib/actions/messaging";
+import { requestNavRefresh } from "@/lib/unread";
 import { emitToast } from "@/lib/toast";
 
 type Message = { id: string; sender_id: string; body: string; created_at: string };
@@ -35,6 +36,13 @@ export function MessageThread({
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
+          // I'm looking at this conversation, so a message from the other
+          // person is read on arrival: mark it, then refresh the nav badge.
+          if ((payload.new as Message).sender_id !== currentUserId) {
+            markConversationRead(conversationId)
+              .then(requestNavRefresh)
+              .catch(() => {});
+          }
           setMessages((current) =>
             current.some((m) => m.id === payload.new.id) ? current : [...current, payload.new as Message]
           );
@@ -45,7 +53,7 @@ export function MessageThread({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, currentUserId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

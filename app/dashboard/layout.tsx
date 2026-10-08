@@ -22,8 +22,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const items: NavItem[] = [
     home,
-    { label: "Announcements", href: "/dashboard/announcements", badge: badges.announcements },
-    { label: "Messages", href: "/dashboard/messages", badge: badges.messages },
+    { label: "Announcements", href: "/dashboard/announcements", badge: badges.announcements, badgeKey: "announcements" },
+    { label: "Messages", href: "/dashboard/messages", badge: badges.messages, badgeKey: "messages" },
     { label: "Timetable", href: "/dashboard/timetable" },
     { label: "Search", href: "/dashboard/search" },
   ];

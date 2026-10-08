@@ -51,28 +51,41 @@ export async function submitHomework(
   return toResult(() => submitHomeworkImpl(...args));
 }
 
+const ALREADY_SUBMITTED = "You've already submitted this homework. Submissions are final and can't be changed.";
+const ALREADY_GRADED = "This submission has already been graded. Grades are final and can't be changed.";
+
 async function submitHomeworkImpl(input: { homeworkId: string; content?: string; fileUrl?: string }) {
   const { id: studentId } = await requireUser();
   const supabase = createClient();
 
-  // Resubmitting must clear any prior grade -- otherwise a teacher's
-  // grade/feedback for the old content stays attached to whatever the
-  // student just replaced it with, silently mismatched.
-  const { error } = await supabase.from("homework_submissions").upsert(
-    {
-      homework_id: input.homeworkId,
-      student_id: studentId,
-      content: input.content ?? null,
-      file_url: input.fileUrl ?? null,
-      submitted_at: new Date().toISOString(),
-      grade: null,
-      feedback: null,
-      graded_at: null,
-      graded_by: null,
-    },
-    { onConflict: "homework_id,student_id" }
-  );
-  if (error) throwDbError(error);
+  const content = input.content?.trim() || null;
+  const fileUrl = input.fileUrl || null;
+  // Final means final: an empty submission would lock the student out
+  // with nothing handed in.
+  if (!content && !fileUrl) throw new Error("Write your answer before submitting.");
+
+  // A submission is final: one per student per homework. The database
+  // enforces this as well (students only have an INSERT policy, see
+  // 0022); this check just gives a clear message instead of a generic one.
+  const { data: existing } = await supabase
+    .from("homework_submissions")
+    .select("id")
+    .eq("homework_id", input.homeworkId)
+    .eq("student_id", studentId)
+    .maybeSingle();
+  if (existing) throw new Error(ALREADY_SUBMITTED);
+
+  const { error } = await supabase.from("homework_submissions").insert({
+    homework_id: input.homeworkId,
+    student_id: studentId,
+    content,
+    file_url: fileUrl,
+  });
+  if (error) {
+    // Two taps / two tabs racing past the check above.
+    if (error.code === "23505") throw new Error(ALREADY_SUBMITTED);
+    throwDbError(error);
+  }
 }
 
 export async function gradeHomeworkSubmission(
@@ -89,16 +102,35 @@ async function gradeHomeworkSubmissionImpl(input: {
   const { id: graderId } = await requireUser();
   const supabase = createClient();
 
-  // RLS (homework_submissions_own) already restricts this update to the
-  // owning subject.s staff -- no separate assertSubjectRole call needed here.
-  const { error } = await supabase
+  if (!Number.isFinite(input.grade) || input.grade < 0) {
+    throw new Error("Enter a grade of 0 or more.");
+  }
+
+  // Grades are final. RLS (0022) only lets staff update a submission that
+  // has no graded_at yet, so the guard below is the friendly version of
+  // the same rule; RLS also keeps non-staff out.
+  const { data: existing } = await supabase
+    .from("homework_submissions")
+    .select("id, graded_at")
+    .eq("id", input.submissionId)
+    .maybeSingle();
+  if (!existing) throw new Error("Submission not found.");
+  if (existing.graded_at) throw new Error(ALREADY_GRADED);
+
+  const { data: updated, error } = await supabase
     .from("homework_submissions")
     .update({
       grade: input.grade,
-      feedback: input.feedback ?? null,
+      feedback: input.feedback?.trim() || null,
       graded_at: new Date().toISOString(),
       graded_by: graderId,
     })
-    .eq("id", input.submissionId);
+    .eq("id", input.submissionId)
+    .is("graded_at", null)
+    .select("id");
   if (error) throwDbError(error);
+  // Zero rows: graded by someone else a moment ago, or not staff for this subject.
+  if (!updated || updated.length === 0) {
+    throw new Error("Couldn't save the grade. It may already be graded, or you may not have permission.");
+  }
 }

@@ -1,6 +1,6 @@
-// Student view: see homework for this topic and submit/update an answer.
-// RLS (homework_submissions_own) already scopes reads/writes to the
-// signed-in student's own submission.
+// Student view: see homework for this topic and submit an answer. A
+// submission is final once handed in. RLS (homework_submissions_select /
+// _insert_own, migration 0022) scopes access to the student's own row.
 
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -35,7 +35,7 @@ export default async function StudentHomeworkPage({
   const { data: mySubmissions } = homeworkIds.length
     ? await supabase
         .from("homework_submissions")
-        .select("id, homework_id, content, grade, feedback, submitted_at")
+        .select("id, homework_id, content, grade, feedback, submitted_at, graded_at")
         .in("homework_id", homeworkIds)
         .eq("student_id", studentId)
     : { data: [] };
@@ -76,14 +76,26 @@ export default async function StudentHomeworkPage({
             </div>
             {hw.instructions && <p className="mb-3 text-sm text-ink-soft">{hw.instructions}</p>}
 
-            {mine?.grade != null && (
-              <div className="mb-3 rounded-lg bg-leaf-soft p-3 text-sm text-ink">
-                <p className="font-medium">Grade: {mine.grade}</p>
-                {mine.feedback && <p className="mt-1 text-ink-soft">{mine.feedback}</p>}
+            {mine ? (
+              <div className="space-y-3">
+                <div className="rounded-lg bg-paper p-3">
+                  <p className="mb-1 text-xs uppercase tracking-wide text-ink-soft">
+                    Your submission · {new Date(mine.submitted_at).toLocaleString()} · final
+                  </p>
+                  <p className="whitespace-pre-wrap text-sm text-ink">{mine.content}</p>
+                </div>
+                {mine.graded_at ? (
+                  <div className="rounded-lg bg-leaf-soft p-3 text-sm text-ink">
+                    <p className="font-medium">Grade: {mine.grade}</p>
+                    {mine.feedback && <p className="mt-1 text-ink-soft">{mine.feedback}</p>}
+                  </div>
+                ) : (
+                  <p className="text-sm text-ink-soft">Waiting to be graded.</p>
+                )}
               </div>
+            ) : (
+              <SubmitHomeworkForm homeworkId={hw.id} />
             )}
-
-            <SubmitHomeworkForm homeworkId={hw.id} existingContent={mine?.content ?? null} />
           </div>
         );
       })}

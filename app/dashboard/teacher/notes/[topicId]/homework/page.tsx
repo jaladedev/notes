@@ -37,7 +37,7 @@ export default async function TeacherHomeworkPage({
   const { data: submissions } = homeworkIds.length
     ? await supabase
         .from("homework_submissions")
-        .select("id, homework_id, student_id, content, file_url, submitted_at, grade, feedback")
+        .select("id, homework_id, student_id, content, file_url, submitted_at, grade, feedback, graded_at")
         .in("homework_id", homeworkIds)
         .order("submitted_at", { ascending: false })
     : { data: [] };
@@ -71,7 +71,7 @@ export default async function TeacherHomeworkPage({
         {(assignments ?? []).map((hw) => {
           const subs = byHomework.get(hw.id) ?? [];
           const status = getDueStatus(hw.due_at, false);
-          const ungraded = subs.filter((s: any) => s.grade == null).length;
+          const ungraded = subs.filter((s: any) => !s.graded_at).length;
           return (
             <div key={hw.id} className="rounded-xl border border-rule bg-white p-4">
               <div className="mb-1 flex items-center justify-between gap-2">
@@ -105,11 +105,14 @@ export default async function TeacherHomeworkPage({
                       </span>
                     </div>
                     {s.content && <p className="mb-2 whitespace-pre-wrap text-sm text-ink">{s.content}</p>}
-                    <GradeSubmissionForm
-                      submissionId={s.id}
-                      existingGrade={s.grade}
-                      existingFeedback={s.feedback}
-                    />
+                    {s.graded_at ? (
+                      <div className="rounded-lg bg-leaf-soft p-2 text-sm text-ink">
+                        <p className="font-medium">Grade: {s.grade} <span className="text-xs font-normal text-ink-soft">· final</span></p>
+                        {s.feedback && <p className="mt-0.5 text-ink-soft">{s.feedback}</p>}
+                      </div>
+                    ) : (
+                      <GradeSubmissionForm submissionId={s.id} />
+                    )}
                   </div>
                 ))}
                 {subs.length === 0 && <p className="text-sm text-ink-soft">No submissions yet.</p>}
