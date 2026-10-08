@@ -8,6 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { ClassRosterPanel } from "@/components/admin/ClassRosterPanel";
+import { ClassEditPanel } from "@/components/admin/ClassEditPanel";
 import { ClassTeachersPanel } from "@/components/admin/ClassTeachersPanel";
 import { PromoteClassPanel } from "@/components/admin/PromoteClassPanel";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -98,6 +99,13 @@ export default async function AdminClassPage({
         ]}
       />
       <h1 className="font-display text-xl font-semibold text-ink">{klass.name}</h1>
+
+      <ClassEditPanel
+        classId={classId}
+        initialName={klass.name}
+        initialLevel={klass.education_level ?? null}
+        initialLevelNumber={klass.level_number ?? null}
+      />
 
       <ClassRosterPanel classId={classId} members={(members ?? []) as any} candidates={candidates} />
 

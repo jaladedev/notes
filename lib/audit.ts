@@ -17,6 +17,8 @@ type AuditAction =
   | "space.create"
   | "class.create"
   | "class.promote"
+  | "class.update"
+  | "class.delete"
   | "class.teacher_assign"
   | "class.teacher_remove"
   | "settings.term_start_save"

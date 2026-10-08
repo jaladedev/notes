@@ -336,6 +336,63 @@ async function createClassImpl(name: string, educationLevel?: EducationLevel, le
   return klass;
 }
 
+export async function updateClass(
+  ...args: Parameters<typeof updateClassImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof updateClassImpl>>>> {
+  return toResult(() => updateClassImpl(...args));
+}
+
+async function updateClassImpl(
+  classId: string,
+  name: string,
+  educationLevel: EducationLevel | null,
+  levelNumber: number | null
+) {
+  const admin_ = await assertGlobalRole(["admin"], "Only an admin can edit a class.");
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("Give the class a name.");
+  if ((educationLevel === null) !== (levelNumber === null)) {
+    throw new Error("Set both the education level and the level number, or leave both empty.");
+  }
+  if (levelNumber !== null && (!Number.isInteger(levelNumber) || levelNumber < 1 || levelNumber > 6)) {
+    throw new Error("Level number must be between 1 and 6.");
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("classes")
+    .update({ name: trimmed, education_level: educationLevel, level_number: levelNumber })
+    .eq("id", classId);
+  if (error) throwDbError(error);
+
+  await writeAuditLog({
+    actorId: admin_.id,
+    action: "class.update",
+    targetType: "class",
+    targetId: classId,
+    metadata: { name: trimmed, educationLevel, levelNumber },
+  });
+  revalidatePath("/dashboard/admin/classes");
+  revalidatePath(`/dashboard/admin/classes/${classId}`);
+}
+
+export async function deleteClass(
+  ...args: Parameters<typeof deleteClassImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof deleteClassImpl>>>> {
+  return toResult(() => deleteClassImpl(...args));
+}
+
+/** Deletes the class, its roster and its teacher assignments. Student accounts and notes are untouched. */
+async function deleteClassImpl(classId: string) {
+  const admin_ = await assertGlobalRole(["admin"], "Only an admin can delete a class.");
+  const admin = createAdminClient();
+  const { error } = await admin.from("classes").delete().eq("id", classId);
+  if (error) throwDbError(error);
+
+  await writeAuditLog({ actorId: admin_.id, action: "class.delete", targetType: "class", targetId: classId });
+  revalidatePath("/dashboard/admin/classes");
+}
+
 export type BulkClassRowResult = { row: number; name: string; ok: boolean; message: string };
 
 /** CSV import for classes, reusing createClass per row so validation and audit logging stay identical to the single-class form. */
