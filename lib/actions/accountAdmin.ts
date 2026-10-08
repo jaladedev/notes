@@ -10,7 +10,9 @@
 import crypto from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { assertGlobalRole } from "@/lib/actions/authGuards";
+import { createClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
+import { assertGlobalRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
@@ -438,6 +440,11 @@ export async function setAccountActive(
 
 async function setAccountActiveImpl(userId: string, active: boolean) {
   const admin_ = await assertGlobalRole(["admin"], "Only an admin can do that.");
+  // If the only admin deactivated themselves, nobody could get back in
+  // through the app. Another admin can still deactivate them.
+  if (!active && userId === admin_.id) {
+    throw new Error("You can't deactivate your own account.");
+  }
   const admin = createAdminClient();
 
   const { error } = await admin.from("profiles").update({ is_active: active }).eq("id", userId);
@@ -464,12 +471,42 @@ async function setAccountActiveImpl(userId: string, active: boolean) {
   revalidatePath("/dashboard/admin/parents");
 }
 
-/** Called from /change-password once the user has set a new password. */
-export async function clearMustChangePassword(userId: string) {
+/**
+ * The /change-password page's only write path. Changes the signed-in user's
+ * password AND clears their forced-reset flag in one server action, so the
+ * flag can only be cleared by actually setting a new password. A standalone
+ * "clear the flag" action would let someone skip the reset (and keep the
+ * temporary password) by calling it directly; one that took a user id would
+ * let anyone clear another user's flag.
+ */
+export async function changeTemporaryPassword(password: string): Promise<ActionResult<void>> {
+  return toResult(() => changeTemporaryPasswordImpl(password));
+}
+
+async function changeTemporaryPasswordImpl(password: string) {
+  const { id: userId } = await requireUser();
+  if (typeof password !== "string" || password.length < 8) {
+    throw new Error("Choose a password with at least 8 characters.");
+  }
+
+  const supabase = createClient();
+  const { error: updateError } = await supabase.auth.updateUser({ password });
+  if (updateError) throw new Error(updateError.message || "Couldn't update your password.");
+
   const admin = createAdminClient();
-  const { error } = await admin
-    .from("profiles")
-    .update({ must_change_password: false })
-    .eq("id", userId);
-  if (error) throwDbError(error);
+  let clearError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { error } = await admin
+      .from("profiles")
+      .update({ must_change_password: false })
+      .eq("id", userId);
+    clearError = error;
+    if (!error) return;
+  }
+  // The password did change, so retrying with the same one will be
+  // refused as "same as the old password"; ask for a different one.
+  logger.error("must_change_password not cleared after password change", { error: clearError, userId });
+  throw new Error(
+    "Your password was updated, but we couldn't finish setting up your account. Please try again with a different password."
+  );
 }

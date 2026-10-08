@@ -7,11 +7,9 @@
 // until they've set a real password.
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { clearMustChangePassword } from "@/lib/actions/accountAdmin";
+import { changeTemporaryPassword } from "@/lib/actions/accountAdmin";
 
 export default function ChangePasswordPage() {
-  const supabase = createClient();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,14 +29,14 @@ export default function ChangePasswordPage() {
     }
 
     setLoading(true);
-    const { data: userData, error: updateError } = await supabase.auth.updateUser({ password });
-    if (updateError || !userData.user) {
+    // One server action changes the password and clears the forced-reset
+    // flag together, so the flag can't be cleared without a real change.
+    const res = await changeTemporaryPassword(password);
+    if (!res.ok) {
       setLoading(false);
-      setError(updateError?.message ?? "Couldn't update your password.");
+      setError(res.error);
       return;
     }
-
-    await clearMustChangePassword(userData.user.id);
 
     // Full navigation -- see login/page.tsx's doc comment: forces
     // middleware and every server component to re-run with the cookie
