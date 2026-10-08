@@ -32,6 +32,30 @@ export default async function AdminClassPage({
     .select("profile_id, profiles(full_name)")
     .eq("class_id", classId);
 
+  // Students who can be added: everyone not already on this roster, with
+  // the class they're currently in (adding moves them).
+  const onRoster = new Set((members ?? []).map((m: any) => m.profile_id));
+  const [{ data: allStudents }, { data: allMemberships }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .eq("role", "student")
+      .eq("is_active", true)
+      .order("full_name"),
+    supabase.from("class_members").select("profile_id, classes(name)"),
+  ]);
+  const currentClass = new Map<string, string>(
+    (allMemberships ?? []).map((m: any) => [m.profile_id, m.classes?.name ?? ""])
+  );
+  const candidates = (allStudents ?? [])
+    .filter((st) => !onRoster.has(st.id))
+    .map((st) => ({
+      id: st.id,
+      fullName: st.full_name,
+      email: st.email ?? "",
+      currentClass: currentClass.get(st.id) || null,
+    }));
+
   // Every subject is linked to every class automatically.
   const { data: subjectRows } = await supabase.from("subjects").select("id, name").order("name");
   const subjects = subjectRows ?? [];
@@ -53,7 +77,7 @@ export default async function AdminClassPage({
       />
       <h1 className="font-display text-xl font-semibold text-ink">{klass.name}</h1>
 
-      <ClassRosterPanel classId={classId} members={(members ?? []) as any} />
+      <ClassRosterPanel classId={classId} members={(members ?? []) as any} candidates={candidates} />
 
       <PromoteClassPanel
         classId={classId}

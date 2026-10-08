@@ -428,6 +428,65 @@ async function addClassMemberImpl(classId: string, studentEmail: string) {
   revalidatePath(`/dashboard/admin/classes/${classId}`);
 }
 
+export async function addClassMembers(
+  ...args: Parameters<typeof addClassMembersImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof addClassMembersImpl>>>> {
+  return toResult(() => addClassMembersImpl(...args));
+}
+
+/**
+ * Enrol several existing students in one class at once. A student belongs to
+ * one class, so anyone already in another class is moved: they're added here
+ * first, then removed from their other classes, so a failure part way never
+ * leaves anyone with no class.
+ */
+async function addClassMembersImpl(classId: string, profileIds: string[]) {
+  await assertGlobalRole(["admin"], "Only an admin can manage a class roster.");
+  const ids = Array.from(new Set(profileIds));
+  if (ids.length === 0) throw new Error("Select at least one student.");
+
+  const admin = createAdminClient();
+  const { data: profiles, error: lookupError } = await admin
+    .from("profiles")
+    .select("id, role")
+    .in("id", ids);
+  if (lookupError) throwDbError(lookupError);
+  const students = (profiles ?? []).filter((p) => p.role === "student");
+  if (students.length !== ids.length) {
+    throw new Error("Only student accounts can be added to a class roster.");
+  }
+
+  const { data: existing, error: existingError } = await admin
+    .from("class_members")
+    .select("class_id, profile_id")
+    .in("profile_id", ids);
+  if (existingError) throwDbError(existingError);
+  const moved = new Set(
+    (existing ?? []).filter((m) => m.class_id !== classId).map((m) => m.profile_id)
+  ).size;
+
+  const { error: addError } = await admin
+    .from("class_members")
+    .upsert(
+      ids.map((id) => ({ class_id: classId, profile_id: id })),
+      { onConflict: "class_id,profile_id" }
+    );
+  if (addError) throwDbError(addError);
+
+  if (moved > 0) {
+    const { error: moveError } = await admin
+      .from("class_members")
+      .delete()
+      .in("profile_id", ids)
+      .neq("class_id", classId);
+    if (moveError) throwDbError(moveError);
+  }
+
+  revalidatePath("/dashboard/admin/classes");
+  revalidatePath(`/dashboard/admin/classes/${classId}`);
+  return { added: ids.length, moved };
+}
+
 export async function removeClassMember(
   ...args: Parameters<typeof removeClassMemberImpl>
 ): Promise<ActionResult<Awaited<ReturnType<typeof removeClassMemberImpl>>>> {
