@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertSubjectRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
+import { toResult, type ActionResult } from "@/lib/actions/result";
 import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
 import type { ResourceType } from "@/types/database";
 
@@ -41,7 +42,13 @@ async function assertTeacherOwnsTopic(
   return topic;
 }
 
-export async function uploadTopicResource(topicId: string, noteId: string, formData: FormData) {
+export async function uploadTopicResource(
+  ...args: Parameters<typeof uploadTopicResourceImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof uploadTopicResourceImpl>>>> {
+  return toResult(() => uploadTopicResourceImpl(...args));
+}
+
+async function uploadTopicResourceImpl(topicId: string, noteId: string, formData: FormData) {
   const { id: teacherId } = await requireUser();
 
   const file = formData.get("file");
@@ -111,7 +118,13 @@ export async function uploadTopicResource(topicId: string, noteId: string, formD
   return { ...inserted, file_url: signed?.signedUrl ?? inserted.file_url };
 }
 
-export async function updateTopicResource(resourceId: string, formData: FormData) {
+export async function updateTopicResource(
+  ...args: Parameters<typeof updateTopicResourceImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof updateTopicResourceImpl>>>> {
+  return toResult(() => updateTopicResourceImpl(...args));
+}
+
+async function updateTopicResourceImpl(resourceId: string, formData: FormData) {
   await requireUser();
   const supabase = createClient();
 
@@ -195,7 +208,13 @@ export async function updateTopicResource(resourceId: string, formData: FormData
  * school (plan doc section 6), there is no path any other school's
  * content could be sharing.
  */
-export async function deleteTopicResource(resourceId: string) {
+export async function deleteTopicResource(
+  ...args: Parameters<typeof deleteTopicResourceImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof deleteTopicResourceImpl>>>> {
+  return toResult(() => deleteTopicResourceImpl(...args));
+}
+
+async function deleteTopicResourceImpl(resourceId: string) {
   await requireUser();
   const supabase = createClient();
 
@@ -234,6 +253,12 @@ import { videoEmbedUrl } from "@/lib/video-embed";
 import { fetchLinkMetadata } from "@/lib/linkPreview";
 
 export async function createVideoEmbedResource(
+  ...args: Parameters<typeof createVideoEmbedResourceImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof createVideoEmbedResourceImpl>>>> {
+  return toResult(() => createVideoEmbedResourceImpl(...args));
+}
+
+async function createVideoEmbedResourceImpl(
   topicId: string,
   noteId: string,
   url: string,
@@ -274,7 +299,13 @@ export async function createVideoEmbedResource(
 // A generic link preview visits the page for og:title/description/image
 // (SSRF-guarded, see lib/linkPreview.ts), unlike createVideoEmbedResource
 // which only needs client-side URL pattern matching.
-export async function createLinkResource(topicId: string, noteId: string, url: string) {
+export async function createLinkResource(
+  ...args: Parameters<typeof createLinkResourceImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof createLinkResourceImpl>>>> {
+  return toResult(() => createLinkResourceImpl(...args));
+}
+
+async function createLinkResourceImpl(topicId: string, noteId: string, url: string) {
   const { id: teacherId } = await requireUser();
   const supabase = createClient();
   await assertTeacherOwnsTopic(supabase, topicId);
@@ -310,7 +341,13 @@ export async function createLinkResource(topicId: string, noteId: string, url: s
 }
 
 /** Re-fetches og:title/description/image for an existing `link` resource, same id. */
-export async function refreshLinkPreview(resourceId: string) {
+export async function refreshLinkPreview(
+  ...args: Parameters<typeof refreshLinkPreviewImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof refreshLinkPreviewImpl>>>> {
+  return toResult(() => refreshLinkPreviewImpl(...args));
+}
+
+async function refreshLinkPreviewImpl(resourceId: string) {
   await requireUser();
   const supabase = createClient();
 
@@ -348,6 +385,12 @@ export async function refreshLinkPreview(resourceId: string) {
 }
 
 export async function createMermaidResource(
+  ...args: Parameters<typeof createMermaidResourceImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof createMermaidResourceImpl>>>> {
+  return toResult(() => createMermaidResourceImpl(...args));
+}
+
+async function createMermaidResourceImpl(
   topicId: string,
   noteId: string,
   title: string,
@@ -393,6 +436,12 @@ export async function createMermaidResource(
 // Edits an existing diagram in place (same resource id) -- any
 // [[resource:ID]] marker pointing at it keeps resolving.
 export async function updateMermaidResource(
+  ...args: Parameters<typeof updateMermaidResourceImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof updateMermaidResourceImpl>>>> {
+  return toResult(() => updateMermaidResourceImpl(...args));
+}
+
+async function updateMermaidResourceImpl(
   resourceId: string,
   title: string,
   mermaidCode: string

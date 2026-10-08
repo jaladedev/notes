@@ -75,7 +75,11 @@ export function ResourceSidebar({
   function handleDelete(resourceId: string) {
     startTransition(async () => {
       try {
-        await deleteTopicResource(resourceId);
+        const res = await deleteTopicResource(resourceId);
+        if (!res.ok) {
+          emitToast(res.error, "error");
+          return;
+        }
         emitToast("Resource removed.");
         router.refresh();
       } catch (err: any) {

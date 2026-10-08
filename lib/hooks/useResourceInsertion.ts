@@ -120,12 +120,17 @@ export function useResourceInsertion({
     try {
       const neededNoteCreation = !currentNoteId;
       const noteIdToUse = await ensureNoteId();
-      const resource = await createMermaidResource(
+      const res = await createMermaidResource(
         topicId,
         noteIdToUse,
         diagramTitle || "Diagram",
         diagramCode
       );
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
+      }
+      const resource = res.data;
       onResourceCreated(resource);
       insertResourceMarker(resource);
       if (neededNoteCreation) {

@@ -187,9 +187,13 @@ function MermaidNodeView({
     setIsSaving(true);
     try {
       const { updateMermaidResource } = await import("@/lib/actions/resources");
-      const updated = await updateMermaidResource(resource.id, title, code);
+      const res = await updateMermaidResource(resource.id, title, code);
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
+      }
       const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
-      storage.onResourceUpdated?.(updated);
+      storage.onResourceUpdated?.(res.data);
       emitToast("Diagram updated.");
       setEditing(false);
     } catch (err: unknown) {
@@ -578,9 +582,13 @@ function ResourceChipDefaultView({
     setIsSaving(true);
     try {
       const { updateTopicResource } = await import("@/lib/actions/resources");
-      const updated = await updateTopicResource(resource.id, formData);
+      const res = await updateTopicResource(resource.id, formData);
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
+      }
       const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
-      storage.onResourceUpdated?.(updated);
+      storage.onResourceUpdated?.(res.data);
       emitToast(replaceFile ? "Resource replaced." : "Resource renamed.");
       setEditing(false);
       setReplaceFile(null);
@@ -602,7 +610,12 @@ function ResourceChipDefaultView({
     setIsRefreshingPreview(true);
     try {
       const { refreshLinkPreview } = await import("@/lib/actions/resources");
-      const updated = await refreshLinkPreview(resource.id);
+      const res = await refreshLinkPreview(resource.id);
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
+      }
+      const updated = res.data;
       const storage: ResourceChipStorage = editor.storage.resourceChip ?? { resources: [] };
       storage.onResourceUpdated?.(updated);
       setEditTitle(updated.title ?? "");

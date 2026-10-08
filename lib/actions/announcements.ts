@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
+import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
 
 /**
@@ -12,7 +13,13 @@ import { writeAuditLog } from "@/lib/audit";
  * they're timetabled to teach (RLS: announcements_write_staff / teaches_class),
  * an admin can post to any class or school-wide.
  */
-export async function createAnnouncement(input: {
+export async function createAnnouncement(
+  ...args: Parameters<typeof createAnnouncementImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof createAnnouncementImpl>>>> {
+  return toResult(() => createAnnouncementImpl(...args));
+}
+
+async function createAnnouncementImpl(input: {
   title: string;
   body: string;
   classId?: string;

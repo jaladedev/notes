@@ -553,7 +553,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     setIsSavingVideoEmbed(true);
     try {
       const savedNoteId = await ensureNoteId();
-      const resource = await createVideoEmbedResource(topicId, savedNoteId, videoUrl, videoTitle);
+      const res = await createVideoEmbedResource(topicId, savedNoteId, videoUrl, videoTitle);
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
+      }
+      const resource = res.data;
       setLocalResources((previous) => [...previous, resource]);
       insertResourceMarker(resource);
       setVideoUrl("");
@@ -571,7 +576,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     setIsSavingLinkPreview(true);
     try {
       const savedNoteId = await ensureNoteId();
-      const resource = await createLinkResource(topicId, savedNoteId, url);
+      const res = await createLinkResource(topicId, savedNoteId, url);
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
+      }
+      const resource = res.data;
       setLocalResources((previous) => [...previous, resource]);
       insertResourceMarker(resource);
       setLinkPreviewUrl("");

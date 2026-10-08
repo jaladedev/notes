@@ -77,10 +77,13 @@ export function useNoteFileUpload({
       formData.set("file", file);
       formData.set("title", "");
       try {
-        const resource = await uploadTopicResource(topicId, noteIdToUse, formData);
-        if (resource) {
-          onResourceCreated(resource);
-          insertResourceMarker(resource);
+        const res = await uploadTopicResource(topicId, noteIdToUse, formData);
+        if (!res.ok) {
+          failures += 1;
+          emitToast(res.error, "error");
+        } else if (res.data) {
+          onResourceCreated(res.data);
+          insertResourceMarker(res.data);
           insertedAny = true;
         }
       } catch (err: unknown) {

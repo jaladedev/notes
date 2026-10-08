@@ -21,15 +21,15 @@ export function CreateAnnouncementForm({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      try {
-        await createAnnouncement({ title, body, classId: classId || undefined });
-        setTitle("");
-        setBody("");
-        router.refresh();
-        emitToast("Announcement posted.", "success");
-      } catch (err: unknown) {
-        emitToast(err instanceof Error ? err.message : "Couldn't post that announcement.", "error");
+      const res = await createAnnouncement({ title, body, classId: classId || undefined });
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
       }
+      setTitle("");
+      setBody("");
+      router.refresh();
+      emitToast("Announcement posted.", "success");
     });
   }
 
