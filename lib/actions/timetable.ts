@@ -210,17 +210,61 @@ async function saveSchoolTimeZoneImpl(timeZone: string) {
   revalidateTimetable();
 }
 
-export async function getTermWeekInfo(): Promise<{ termStart: string | null; currentWeek: number | null }> {
+export async function getTermWeekInfo(): Promise<{
+  termStart: string | null;
+  currentWeek: number | null;
+  academicYear: string | null;
+  term: number | null;
+}> {
   await requireUser();
   const supabase = createClient();
   const [{ data: row }, { data: week }] = await Promise.all([
-    supabase.from("settings").select("term_start_date").maybeSingle(),
+    supabase.from("settings").select("term_start_date, current_academic_year, current_term").maybeSingle(),
     supabase.rpc("current_school_week"),
   ]);
+  const r = row as {
+    term_start_date?: string | null;
+    current_academic_year?: string | null;
+    current_term?: number | null;
+  } | null;
   return {
-    termStart: (row as { term_start_date?: string | null } | null)?.term_start_date ?? null,
+    termStart: r?.term_start_date ?? null,
     currentWeek: typeof week === "number" ? week : null,
+    academicYear: r?.current_academic_year ?? null,
+    term: r?.current_term ?? null,
   };
+}
+
+/** Set the current academic year (e.g. 2026/2027) and term (1-3), or both null to stop gating by year/term. */
+export async function saveCurrentTerm(academicYear: string | null, term: number | null): Promise<ActionResult> {
+  return toResult(async () => {
+    const admin_ = await assertGlobalRole(["admin"], "Only an admin can change the current term.");
+    const year = academicYear?.trim() || null;
+    if ((year === null) !== (term === null)) {
+      throw new Error("Set both the academic year and the term, or leave both empty.");
+    }
+    if (year && !/^\d{4}\/\d{4}$/.test(year)) {
+      throw new Error("Academic year should look like 2026/2027.");
+    }
+    if (term !== null && ![1, 2, 3].includes(term)) throw new Error("Term must be 1, 2 or 3.");
+
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("settings")
+      .update({ current_academic_year: year, current_term: term })
+      .eq("id", true);
+    if (error) throwDbError(error);
+
+    await writeAuditLog({
+      actorId: admin_.id,
+      action: "settings.term_save",
+      targetType: "settings",
+      metadata: { academicYear: year, term },
+    });
+    revalidateTimetable();
+    revalidatePath("/dashboard/student", "layout");
+    return undefined;
+  });
 }
 
 /** Set the date Week 1 starts (YYYY-MM-DD), or null to switch the week gate off. */

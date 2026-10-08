@@ -33,7 +33,12 @@ export default async function AdminTimetablePage() {
 
       <PeriodsPanel periods={periods} timeZone={timeZone} />
 
-      <TermStartPanel termStart={weekInfo.termStart} currentWeek={weekInfo.currentWeek} />
+      <TermStartPanel
+        termStart={weekInfo.termStart}
+        currentWeek={weekInfo.currentWeek}
+        academicYear={weekInfo.academicYear}
+        term={weekInfo.term}
+      />
 
       <section className="rounded-xl border border-rule bg-white p-4">
         <h2 className="mb-3 font-display text-lg font-semibold text-ink">Classes</h2>

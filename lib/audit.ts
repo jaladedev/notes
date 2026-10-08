@@ -22,6 +22,7 @@ type AuditAction =
   | "class.teacher_assign"
   | "class.teacher_remove"
   | "settings.term_start_save"
+  | "settings.term_save"
   | "timetable.period_save"
   | "timetable.period_delete"
   | "timetable.timezone_save"
