@@ -36,11 +36,10 @@ export default async function StudentLevelPage({
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
-      <Breadcrumbs items={[{ label: `${level.toUpperCase()}${levelNumber}` }]} />
+      <Breadcrumbs items={[{ label: `${level.toUpperCase()} ${levelNumber}` }]} />
       <div className="mb-4 flex items-center justify-between">
         <h1 className="font-display text-xl font-semibold text-ink">
-          {level.toUpperCase()}
-          {levelNumber}
+          {level.toUpperCase()} {levelNumber}
         </h1>
         <Link href="/dashboard/timetable" className="text-sm text-ink underline">
           Timetable

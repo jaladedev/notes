@@ -50,7 +50,7 @@ export default async function StudentLevelSubjectPage({
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
       <Breadcrumbs
         items={[
-          { label: `${level.toUpperCase()}${levelNumber}`, href: `/dashboard/student/levels/${level}/${levelNumber}` },
+          { label: `${level.toUpperCase()} ${levelNumber}`, href: `/dashboard/student/levels/${level}/${levelNumber}` },
           { label: subject.name },
         ]}
       />

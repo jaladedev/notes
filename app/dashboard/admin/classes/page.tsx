@@ -38,8 +38,7 @@ export default async function AdminClassesPage() {
               {c.name}
               {c.education_level && (
                 <span className="ml-2 text-xs uppercase tracking-wide text-ink-soft">
-                  {c.education_level}
-                  {c.level_number}
+                  {c.education_level} {c.level_number}
                 </span>
               )}
             </Link>

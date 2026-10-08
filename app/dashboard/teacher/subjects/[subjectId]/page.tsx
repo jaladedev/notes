@@ -47,7 +47,7 @@ export default async function TeacherSubjectPage({
   const groups = new Map<string, { label: string; topics: NonNullable<typeof topics> }>();
   for (const t of topics ?? []) {
     const key = `${t.education_level}-${t.level_number}-${t.academic_year}-${t.term}`;
-    const label = `${t.education_level?.toUpperCase()}${t.level_number} · ${t.academic_year} · Term ${t.term}`;
+    const label = `${t.education_level?.toUpperCase()} ${t.level_number} · ${t.academic_year} · Term ${t.term}`;
     if (!groups.has(key)) groups.set(key, { label, topics: [] });
     groups.get(key)!.topics.push(t);
   }

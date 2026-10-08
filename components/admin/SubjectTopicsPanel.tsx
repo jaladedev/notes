@@ -57,8 +57,7 @@ export function SubjectTopicsPanel({ subjectId, topics }: { subjectId: string; t
         {topics.map((t) => (
           <li key={t.id}>
             <Link href={`/dashboard/teacher/notes/${t.id}`} className="text-sm text-ink hover:underline">
-              {t.education_level.toUpperCase()}
-              {t.level_number} · {t.academic_year} · T{t.term}
+              {t.education_level.toUpperCase()} {t.level_number} · {t.academic_year} · T{t.term}
               {t.week_number != null ? ` · Wk ${t.week_number}` : ""} — {t.title}
             </Link>
           </li>
