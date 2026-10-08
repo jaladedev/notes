@@ -23,13 +23,24 @@ export default async function DashboardIndex() {
   if (profile?.role === "student") {
     const { data: membership } = await supabase
       .from("class_members")
-      .select("classes(education_level, level_number)")
+      .select("classes(name, education_level, level_number)")
       .eq("profile_id", userId)
+      .limit(1)
       .maybeSingle();
     const klass = (membership as any)?.classes;
     if (klass?.education_level && klass?.level_number) {
       redirect(`/dashboard/student/levels/${klass.education_level}/${klass.level_number}`);
     }
+    // Never fall through to the teacher message below -- say what's actually missing.
+    return (
+      <div className="mx-auto max-w-md p-8 text-center">
+        <p className="text-ink">
+          {klass
+            ? `Your class (${klass.name}) isn't set up with a level yet, so your notes can't be shown. Ask an admin to set its education level and level number.`
+            : "You haven't been added to a class yet. Ask an admin to add you to one."}
+        </p>
+      </div>
+    );
   }
 
   const { data: subjectAssignments } = await supabase
