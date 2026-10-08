@@ -27,24 +27,24 @@ export function ShareLinkManager({ topicId, links }: { topicId: string; links: S
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      try {
-        await createShareLink(topicId, { accessCode: accessCode.trim() || undefined });
-        setAccessCode("");
-        router.refresh();
-      } catch (err: unknown) {
-        emitToast(err instanceof Error ? err.message : "Couldn't create a share link.", "error");
+      const res = await createShareLink(topicId, { accessCode: accessCode.trim() || undefined });
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
       }
+      setAccessCode("");
+      router.refresh();
     });
   }
 
   function handleRevoke(linkId: string) {
     startTransition(async () => {
-      try {
-        await revokeShareLink(linkId);
-        router.refresh();
-      } catch (err: unknown) {
-        emitToast(err instanceof Error ? err.message : "Couldn't revoke that link.", "error");
+      const res = await revokeShareLink(linkId);
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
       }
+      router.refresh();
     });
   }
 

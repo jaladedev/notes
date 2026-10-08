@@ -15,24 +15,24 @@ export function ClassRosterPanel({ classId, members }: { classId: string; member
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      try {
-        await addClassMember(classId, email);
-        setEmail("");
-        router.refresh();
-      } catch (err: unknown) {
-        emitToast(err instanceof Error ? err.message : "Couldn't add that student.", "error");
+      const res = await addClassMember(classId, email);
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
       }
+      setEmail("");
+      router.refresh();
     });
   }
 
   function handleRemove(profileId: string) {
     startTransition(async () => {
-      try {
-        await removeClassMember(classId, profileId);
-        router.refresh();
-      } catch (err: unknown) {
-        emitToast(err instanceof Error ? err.message : "Couldn't remove that student.", "error");
+      const res = await removeClassMember(classId, profileId);
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
       }
+      router.refresh();
     });
   }
 

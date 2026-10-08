@@ -31,22 +31,22 @@ export function SubjectTopicsPanel({ subjectId, topics }: { subjectId: string; t
   function add(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      try {
-        await createTopic({
-          subjectId,
-          title,
-          educationLevel,
-          levelNumber: Number(levelNumber),
-          academicYear: academicYear.trim(),
-          term: Number(term) as 1 | 2 | 3,
-          weekNumber: weekNumber.trim() ? Number(weekNumber) : undefined,
-        });
-        setTitle("");
-        setWeekNumber("");
-        router.refresh();
-      } catch (err) {
-        emitToast(err instanceof Error ? err.message : "Couldn't create that topic.", "error");
+      const res = await createTopic({
+        subjectId,
+        title,
+        educationLevel,
+        levelNumber: Number(levelNumber),
+        academicYear: academicYear.trim(),
+        term: Number(term) as 1 | 2 | 3,
+        weekNumber: weekNumber.trim() ? Number(weekNumber) : undefined,
+      });
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
       }
+      setTitle("");
+      setWeekNumber("");
+      router.refresh();
     });
   }
 

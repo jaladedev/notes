@@ -145,7 +145,13 @@ export async function getTopicNoteVersionContent(noteId: string): Promise<string
   return data.content;
 }
 
-export async function restoreTopicNoteVersion(topicId: string, versionNoteId: string) {
+export async function restoreTopicNoteVersion(
+  ...args: Parameters<typeof restoreTopicNoteVersionImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof restoreTopicNoteVersionImpl>>>> {
+  return toResult(() => restoreTopicNoteVersionImpl(...args));
+}
+
+async function restoreTopicNoteVersionImpl(topicId: string, versionNoteId: string) {
   const supabase = createClient();
   const { id: teacherId } = await requireUser();
 
@@ -177,7 +183,13 @@ export async function restoreTopicNoteVersion(topicId: string, versionNoteId: st
  * still references it. Otherwise note_id is reassigned to the newest
  * surviving version that does.
  */
-export async function deleteTopicNoteVersion(topicId: string, versionNoteId: string) {
+export async function deleteTopicNoteVersion(
+  ...args: Parameters<typeof deleteTopicNoteVersionImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof deleteTopicNoteVersionImpl>>>> {
+  return toResult(() => deleteTopicNoteVersionImpl(...args));
+}
+
+async function deleteTopicNoteVersionImpl(topicId: string, versionNoteId: string) {
   const supabase = createClient();
   const { id: teacherId } = await requireUser();
 
@@ -277,7 +289,13 @@ type CurriculumSlot = {
   classId?: string;
 };
 
-export async function createClass(name: string, educationLevel?: EducationLevel, levelNumber?: number) {
+export async function createClass(
+  ...args: Parameters<typeof createClassImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof createClassImpl>>>> {
+  return toResult(() => createClassImpl(...args));
+}
+
+async function createClassImpl(name: string, educationLevel?: EducationLevel, levelNumber?: number) {
   // Fixed: this used to only check requireUser() (any signed-in
   // account, including a student, could create classes) -- stale
   // reasoning from before admin-provisioned accounts existed. Now
@@ -310,6 +328,12 @@ export type BulkClassRowResult = { row: number; name: string; ok: boolean; messa
 
 /** CSV import for classes, reusing createClass per row so validation and audit logging stay identical to the single-class form. */
 export async function bulkCreateClasses(
+  ...args: Parameters<typeof bulkCreateClassesImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof bulkCreateClassesImpl>>>> {
+  return toResult(() => bulkCreateClassesImpl(...args));
+}
+
+async function bulkCreateClassesImpl(
   rows: { name: string; educationLevel?: string; levelNumber?: string }[]
 ): Promise<BulkClassRowResult[]> {
   await assertGlobalRole(["admin"], "Only an admin can create a class.");
@@ -340,7 +364,7 @@ export async function bulkCreateClasses(
       continue;
     }
     try {
-      await createClass(r.name, level as EducationLevel | undefined, levelNumber);
+      await createClassImpl(r.name, level as EducationLevel | undefined, levelNumber);
       results.push({ row: rowNumber, name: r.name, ok: true, message: "Created." });
     } catch (err) {
       results.push({
@@ -356,7 +380,13 @@ export async function bulkCreateClasses(
   return results;
 }
 
-export async function addClassMember(classId: string, studentEmail: string) {
+export async function addClassMember(
+  ...args: Parameters<typeof addClassMemberImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof addClassMemberImpl>>>> {
+  return toResult(() => addClassMemberImpl(...args));
+}
+
+async function addClassMemberImpl(classId: string, studentEmail: string) {
   // Fixed: same requireUser()-only gap as createClass. Also rewritten
   // to look up by profiles.email (added in 0006_admin_accounts.sql)
   // instead of admin.auth.admin.listUsers() -- that call only returns
@@ -386,7 +416,13 @@ export async function addClassMember(classId: string, studentEmail: string) {
   revalidatePath(`/dashboard/admin/classes/${classId}`);
 }
 
-export async function removeClassMember(classId: string, profileId: string) {
+export async function removeClassMember(
+  ...args: Parameters<typeof removeClassMemberImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof removeClassMemberImpl>>>> {
+  return toResult(() => removeClassMemberImpl(...args));
+}
+
+async function removeClassMemberImpl(classId: string, profileId: string) {
   // Fixed: same requireUser()-only gap as createClass/addClassMember.
   await assertGlobalRole(["admin"], "Only an admin can manage a class roster.");
   const admin = createAdminClient();
@@ -482,6 +518,12 @@ async function createSubjectImpl(name: string) {
 }
 
 export async function assignTeacherToSubject(
+  ...args: Parameters<typeof assignTeacherToSubjectImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof assignTeacherToSubjectImpl>>>> {
+  return toResult(() => assignTeacherToSubjectImpl(...args));
+}
+
+async function assignTeacherToSubjectImpl(
   subjectId: string,
   teacherEmail: string,
   role: "teacher" | "reviewer" = "teacher"
@@ -507,7 +549,13 @@ export async function assignTeacherToSubject(
   revalidatePath(`/dashboard/admin/subjects/${subjectId}`);
 }
 
-export async function removeTeacherFromSubject(subjectId: string, profileId: string) {
+export async function removeTeacherFromSubject(
+  ...args: Parameters<typeof removeTeacherFromSubjectImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof removeTeacherFromSubjectImpl>>>> {
+  return toResult(() => removeTeacherFromSubjectImpl(...args));
+}
+
+async function removeTeacherFromSubjectImpl(subjectId: string, profileId: string) {
   await assertGlobalRole(["admin"], "Only an admin can manage subject assignments.");
   const admin = createAdminClient();
   const { error } = await admin
@@ -527,7 +575,13 @@ export async function removeTeacherFromSubject(subjectId: string, profileId: str
  * left: a class only determines which level's topics a student can read
  * (via class_members -> classes.education_level/level_number).
  */
-export async function createTopic(input: {
+export async function createTopic(
+  ...args: Parameters<typeof createTopicImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof createTopicImpl>>>> {
+  return toResult(() => createTopicImpl(...args));
+}
+
+async function createTopicImpl(input: {
   subjectId: string;
   title: string;
   educationLevel: EducationLevel;
@@ -618,6 +672,12 @@ function generateShareToken(): string {
 }
 
 export async function createShareLink(
+  ...args: Parameters<typeof createShareLinkImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof createShareLinkImpl>>>> {
+  return toResult(() => createShareLinkImpl(...args));
+}
+
+async function createShareLinkImpl(
   topicId: string,
   options: { accessCode?: string; expiresAt?: string } = {}
 ) {
@@ -650,7 +710,13 @@ export async function createShareLink(
   return link;
 }
 
-export async function revokeShareLink(linkId: string) {
+export async function revokeShareLink(
+  ...args: Parameters<typeof revokeShareLinkImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof revokeShareLinkImpl>>>> {
+  return toResult(() => revokeShareLinkImpl(...args));
+}
+
+async function revokeShareLinkImpl(linkId: string) {
   const supabase = createClient();
   const { data: link } = await supabase
     .from("share_links")

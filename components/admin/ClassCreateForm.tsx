@@ -15,17 +15,17 @@ export function ClassCreateForm() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      try {
-        const klass = await createClass(
-          name,
-          educationLevel || undefined,
-          levelNumber ? Number(levelNumber) : undefined
-        );
-        setName("");
-        router.push(`/dashboard/admin/classes/${klass.id}`);
-      } catch (err: unknown) {
-        emitToast(err instanceof Error ? err.message : "Couldn't create that class.", "error");
+      const res = await createClass(
+        name,
+        educationLevel || undefined,
+        levelNumber ? Number(levelNumber) : undefined
+      );
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
       }
+      setName("");
+      router.push(`/dashboard/admin/classes/${res.data.id}`);
     });
   }
 

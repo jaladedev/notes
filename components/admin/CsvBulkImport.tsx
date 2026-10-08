@@ -18,6 +18,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { parseCsvWithHeader } from "@/lib/csv";
 import { emitToast } from "@/lib/toast";
+import type { ActionResult } from "@/lib/actions/result";
 
 type RowResult = { row: number; ok: boolean; message: string } & Record<string, unknown>;
 
@@ -57,7 +58,7 @@ export function CsvBulkImport<TRow>({
   sampleRow: string;
   mapRow: (record: Record<string, string>) => TRow;
   labelKey: (row: TRow) => string;
-  onImport: (rows: TRow[]) => Promise<RowResult[]>;
+  onImport: (rows: TRow[]) => Promise<ActionResult<RowResult[]>>;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -78,7 +79,11 @@ export function CsvBulkImport<TRow>({
       startTransition(async () => {
         try {
           const res = await onImport(rows);
-          setResults(res.map((r, i) => ({ ...r, label: labelKey(rows[i]) })));
+          if (!res.ok) {
+            emitToast(res.error, "error");
+            return;
+          }
+          setResults(res.data.map((r, i) => ({ ...r, label: labelKey(rows[i]) })));
           router.refresh();
         } catch (err: unknown) {
           emitToast(err instanceof Error ? err.message : "Import failed.", "error");

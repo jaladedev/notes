@@ -22,19 +22,23 @@ export function SubjectTeachersPanel({
   function add(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      try {
-        await assignTeacherToSubject(subjectId, email, role);
-        setEmail("");
-        router.refresh();
-      } catch (err) {
-        emitToast(err instanceof Error ? err.message : "Couldn't assign that teacher.", "error");
+      const res = await assignTeacherToSubject(subjectId, email, role);
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
       }
+      setEmail("");
+      router.refresh();
     });
   }
 
   function remove(profileId: string) {
     startTransition(async () => {
-      await removeTeacherFromSubject(subjectId, profileId);
+      const res = await removeTeacherFromSubject(subjectId, profileId);
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
+      }
       router.refresh();
     });
   }

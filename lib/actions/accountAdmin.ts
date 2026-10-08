@@ -244,6 +244,12 @@ export type BulkImportRowResult = {
  * so failures are collected and returned instead.
  */
 export async function bulkCreateStudents(
+  ...args: Parameters<typeof bulkCreateStudentsImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof bulkCreateStudentsImpl>>>> {
+  return toResult(() => bulkCreateStudentsImpl(...args));
+}
+
+async function bulkCreateStudentsImpl(
   rows: { fullName: string; email: string; className?: string }[]
 ): Promise<BulkImportRowResult[]> {
   await assertGlobalRole(["admin"], "Only an admin can create accounts.");

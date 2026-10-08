@@ -46,7 +46,12 @@ export function RestoreVersionButton({
         onClick={() =>
           startTransition(async () => {
             try {
-              await restoreTopicNoteVersion(topicId, versionNoteId);
+              const res = await restoreTopicNoteVersion(topicId, versionNoteId);
+              if (!res.ok) {
+                emitToast(res.error, "error");
+                setConfirming(false);
+                return;
+              }
               emitToast(`Version ${versionNumber} restored as a new draft.`);
               setConfirming(false);
               // The note editor above holds its own client-side state

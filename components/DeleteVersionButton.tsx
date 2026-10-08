@@ -48,7 +48,12 @@ export function DeleteVersionButton({
         onClick={() =>
           startTransition(async () => {
             try {
-              await deleteTopicNoteVersion(topicId, versionNoteId);
+              const res = await deleteTopicNoteVersion(topicId, versionNoteId);
+              if (!res.ok) {
+                emitToast(res.error, "error");
+                setConfirming(false);
+                return;
+              }
               emitToast(`Version ${versionNumber} deleted.`);
               setConfirming(false);
               router.refresh();
