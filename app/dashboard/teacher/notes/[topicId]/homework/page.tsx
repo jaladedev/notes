@@ -8,6 +8,7 @@ import { CreateHomeworkForm } from "@/components/homework/CreateHomeworkForm";
 import { GradeSubmissionForm } from "@/components/homework/GradeSubmissionForm";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { getDueStatus, DUE_STATUS_STYLES, DUE_STATUS_LABELS } from "@/lib/dueStatus";
+import { getProfileNames } from "@/lib/actions/studentNames";
 
 export default async function TeacherHomeworkPage({
   params,
@@ -36,10 +37,12 @@ export default async function TeacherHomeworkPage({
   const { data: submissions } = homeworkIds.length
     ? await supabase
         .from("homework_submissions")
-        .select("id, homework_id, content, file_url, submitted_at, grade, feedback, profiles(full_name)")
+        .select("id, homework_id, student_id, content, file_url, submitted_at, grade, feedback")
         .in("homework_id", homeworkIds)
         .order("submitted_at", { ascending: false })
     : { data: [] };
+
+  const studentNames = await getProfileNames((submissions ?? []).map((s) => s.student_id));
 
   const byHomework = new Map<string, typeof submissions>();
   for (const s of submissions ?? []) {
@@ -96,7 +99,7 @@ export default async function TeacherHomeworkPage({
                 {subs.map((s: any) => (
                   <div key={s.id} className="rounded-lg bg-paper p-3">
                     <div className="mb-1 flex items-center justify-between">
-                      <span className="text-sm font-medium text-ink">{s.profiles?.full_name}</span>
+                      <span className="text-sm font-medium text-ink">{studentNames.get(s.student_id) ?? "Student"}</span>
                       <span className="text-xs text-ink-soft">
                         {new Date(s.submitted_at).toLocaleString()}
                       </span>

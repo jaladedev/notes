@@ -47,7 +47,7 @@ export default async function StudentHomeworkPage({
       <div>
         <Breadcrumbs
           items={[
-            { label: "Spaces", href: "/dashboard/student" },
+            { label: "Dashboard", href: "/dashboard" },
             { label: (topic as any).subjects?.name ?? "Subject", href: `/dashboard/student/levels/${topic.education_level}/${topic.level_number}/${topic.subject_id}` },
             { label: topic.title, href: `/dashboard/student/topics/${topicId}` },
             { label: "Homework" },

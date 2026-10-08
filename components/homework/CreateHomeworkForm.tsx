@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createHomework } from "@/lib/actions/homework";
 import { emitToast } from "@/lib/toast";
+import { earliestDueInputValue } from "@/lib/dueDate";
 
 export function CreateHomeworkForm({ topicId }: { topicId: string }) {
   const router = useRouter();
@@ -15,21 +16,21 @@ export function CreateHomeworkForm({ topicId }: { topicId: string }) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     startTransition(async () => {
-      try {
-        await createHomework({
-          topicId,
-          title,
-          instructions: instructions || undefined,
-          dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
-        });
-        setTitle("");
-        setInstructions("");
-        setDueAt("");
-        router.refresh();
-        emitToast("Homework posted.", "success");
-      } catch (err: unknown) {
-        emitToast(err instanceof Error ? err.message : "Couldn't post that homework.", "error");
+      const res = await createHomework({
+        topicId,
+        title,
+        instructions: instructions || undefined,
+        dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
+      });
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
       }
+      setTitle("");
+      setInstructions("");
+      setDueAt("");
+      router.refresh();
+      emitToast("Homework posted.", "success");
     });
   }
 
@@ -54,9 +55,13 @@ export function CreateHomeworkForm({ topicId }: { topicId: string }) {
         className="w-full rounded-lg border border-rule px-3 py-2 text-sm text-ink"
       />
       <div>
-        <label className="mb-1 block text-xs font-medium text-ink-soft">Due (optional)</label>
+        <label className="mb-1 block text-xs font-medium text-ink-soft">
+          Due (optional) - tomorrow or later
+        </label>
         <input
           type="datetime-local"
+          min={earliestDueInputValue()}
+          suppressHydrationWarning
           value={dueAt}
           onChange={(e) => setDueAt(e.target.value)}
           title="Due date and time (optional)"

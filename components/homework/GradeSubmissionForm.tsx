@@ -27,13 +27,17 @@ export function GradeSubmissionForm({
       return;
     }
     startTransition(async () => {
-      try {
-        await gradeHomeworkSubmission({ submissionId, grade: parsed, feedback: feedback || undefined });
-        router.refresh();
-        emitToast("Grade saved.", "success");
-      } catch (err: unknown) {
-        emitToast(err instanceof Error ? err.message : "Couldn't save that grade.", "error");
+      const res = await gradeHomeworkSubmission({
+        submissionId,
+        grade: parsed,
+        feedback: feedback || undefined,
+      });
+      if (!res.ok) {
+        emitToast(res.error, "error");
+        return;
       }
+      router.refresh();
+      emitToast("Grade saved.", "success");
     });
   }
 

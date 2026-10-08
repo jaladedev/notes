@@ -8,6 +8,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { assertSubjectRole } from "@/lib/actions/authGuards";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { getProfileNames } from "@/lib/actions/studentNames";
+import { getSchoolTimeZone } from "@/lib/actions/timetable";
 
 export default async function TeacherSubjectPage({
   params,
@@ -43,6 +45,28 @@ export default async function TeacherSubjectPage({
   for (const n of notes ?? []) {
     if (!latestStatusByTopic.has(n.topic_id)) latestStatusByTopic.set(n.topic_id, n.status);
   }
+
+  // Ungraded homework across this subject's topics. Read through the
+  // request-scoped client, so RLS (is_topic_staff) decides what a teacher
+  // can see; only the display names need the admin client.
+  const topicTitleById = new Map((topics ?? []).map((t) => [t.id, t.title]));
+  const { data: homeworkRows } = topicIds.length
+    ? await supabase.from("homework").select("id, title, topic_id").in("topic_id", topicIds)
+    : { data: [] };
+  const homeworkById = new Map((homeworkRows ?? []).map((h) => [h.id, h]));
+  const { data: pendingRows } = homeworkById.size
+    ? await supabase
+        .from("homework_submissions")
+        .select("id, homework_id, student_id, submitted_at")
+        .in("homework_id", [...homeworkById.keys()])
+        .is("grade", null)
+        .order("submitted_at", { ascending: false })
+        .limit(50)
+    : { data: [] };
+  const pending = pendingRows ?? [];
+  const pendingNames = await getProfileNames(pending.map((p) => p.student_id));
+  const schoolTz = pending.length ? await getSchoolTimeZone() : "UTC";
+  const PENDING_SHOWN = 8;
 
   const { data: settings } = await supabase
     .from("settings")
@@ -116,6 +140,49 @@ export default async function TeacherSubjectPage({
           </Link>
         </div>
       </div>
+
+      {pending.length > 0 && (
+        <section className="mb-6 rounded-xl border border-marigold bg-white p-4">
+          <h2 className="mb-2 font-display text-sm font-semibold text-ink">
+            Homework to grade ({pending.length}
+            {pending.length === 50 ? "+" : ""})
+          </h2>
+          <ul className="space-y-2">
+            {pending.slice(0, PENDING_SHOWN).map((p) => {
+              const hw = homeworkById.get(p.homework_id);
+              return (
+                <li key={p.id}>
+                  <Link
+                    href={`/dashboard/teacher/notes/${hw?.topic_id}/homework`}
+                    className="flex items-center justify-between gap-3 rounded-lg bg-paper p-3 text-sm hover:ring-1 hover:ring-marigold"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-ink">
+                        {pendingNames.get(p.student_id) ?? "Student"} · {hw?.title}
+                      </span>
+                      <span className="block truncate text-xs text-ink-soft">
+                        {hw ? topicTitleById.get(hw.topic_id) : ""}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs text-ink-soft">
+                      {new Date(p.submitted_at).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        timeZone: schoolTz,
+                      })}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          {pending.length > PENDING_SHOWN && (
+            <p className="mt-2 text-xs text-ink-soft">
+              and {pending.length - PENDING_SHOWN} more. Open a topic&apos;s homework page to grade them.
+            </p>
+          )}
+        </section>
+      )}
 
       {groups.size === 0 ? (
         <p className="text-sm text-ink-soft">

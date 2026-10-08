@@ -5,8 +5,16 @@ import { createClient } from "@/lib/supabase/server";
 import { assertSubjectRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
+import { getSchoolTimeZone } from "@/lib/actions/timetable";
+import { validateDueDate } from "@/lib/dueDate";
 
-export async function createHomework(input: {
+export async function createHomework(
+  ...args: Parameters<typeof createHomeworkImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof createHomeworkImpl>>>> {
+  return toResult(() => createHomeworkImpl(...args));
+}
+
+async function createHomeworkImpl(input: {
   topicId: string;
   title: string;
   instructions?: string;
@@ -17,6 +25,13 @@ export async function createHomework(input: {
   if (!topic) throw new Error("Topic not found.");
 
   const { id: userId } = await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
+
+  // Checked on the server, not just by the form's min attribute, which a
+  // browser can't enforce for a stale tab or a direct call.
+  if (input.dueAt) {
+    const problem = validateDueDate(input.dueAt, new Date(), await getSchoolTimeZone());
+    if (problem) throw new Error(problem);
+  }
 
   const { error } = await supabase.from("homework").insert({
     topic_id: input.topicId,
@@ -60,7 +75,13 @@ async function submitHomeworkImpl(input: { homeworkId: string; content?: string;
   if (error) throwDbError(error);
 }
 
-export async function gradeHomeworkSubmission(input: {
+export async function gradeHomeworkSubmission(
+  ...args: Parameters<typeof gradeHomeworkSubmissionImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof gradeHomeworkSubmissionImpl>>>> {
+  return toResult(() => gradeHomeworkSubmissionImpl(...args));
+}
+
+async function gradeHomeworkSubmissionImpl(input: {
   submissionId: string;
   grade: number;
   feedback?: string;

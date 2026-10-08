@@ -113,7 +113,10 @@ export async function getUnreadMessageCount(): Promise<number> {
 /**
  * Contacts the current user is allowed to start a conversation with: anyone
  * sharing a subject assignment (teacher_subjects) or a class (class_members,
- * or a teacher timetabled to that class) with them. Deliberately narrower
+ * or a teacher who teaches that class) with them. "Teaches that class" means
+ * the same thing as the database's teaches_class(): a timetable entry OR a
+ * class_subject_teachers row. Checking only the timetable left students
+ * seeing nothing but classmates until a timetable had been filled in. Deliberately narrower
  * than "every profile in the school" -- profiles RLS only lets a user read
  * their own row (plus admin's read-all), so this goes through the admin
  * client but filters to real relationships rather than exposing every
@@ -127,16 +130,19 @@ export async function searchMessageableContacts(query: string) {
   // exposing every profile in the school.
   const admin = createAdminClient();
 
-  const [{ data: mySubjects }, { data: myClasses }, { data: myTaughtClasses }] = await Promise.all([
-    admin.from("teacher_subjects").select("subject_id").eq("profile_id", userId),
-    admin.from("class_members").select("class_id").eq("profile_id", userId),
-    admin.from("timetable_entries").select("class_id").eq("teacher_id", userId),
-  ]);
+  const [{ data: mySubjects }, { data: myClasses }, { data: myTimetabled }, { data: myAssigned }] =
+    await Promise.all([
+      admin.from("teacher_subjects").select("subject_id").eq("profile_id", userId),
+      admin.from("class_members").select("class_id").eq("profile_id", userId),
+      admin.from("timetable_entries").select("class_id").eq("teacher_id", userId),
+      admin.from("class_subject_teachers").select("class_id").eq("teacher_id", userId),
+    ]);
   const subjectIds = (mySubjects ?? []).map((s) => s.subject_id);
   const classIds = [
     ...new Set([
       ...(myClasses ?? []).map((c) => c.class_id),
-      ...(myTaughtClasses ?? []).map((c) => c.class_id),
+      ...(myTimetabled ?? []).map((c) => c.class_id),
+      ...(myAssigned ?? []).map((c) => c.class_id),
     ]),
   ];
 
@@ -157,19 +163,24 @@ export async function searchMessageableContacts(query: string) {
   }
 
   if (classIds.length > 0) {
-    const [{ data: classmates }, { data: classTeachers }] = await Promise.all([
+    const [{ data: classmates }, { data: timetableTeachers }, { data: assignedTeachers }] = await Promise.all([
       admin.from("class_members").select("profile_id, profiles(id, full_name)").in("class_id", classIds),
       admin
         .from("timetable_entries")
         .select("teacher_id, profiles:profiles!timetable_entries_teacher_id_fkey(id, full_name)")
         .in("class_id", classIds)
         .not("teacher_id", "is", null),
+      admin
+        .from("class_subject_teachers")
+        .select("teacher_id, profiles:profiles!class_subject_teachers_teacher_id_fkey(id, full_name)")
+        .in("class_id", classIds),
     ]);
+    const classTeachers = [...(timetableTeachers ?? []), ...(assignedTeachers ?? [])];
     for (const c of classmates ?? []) {
       const p = (c as any).profiles;
       if (p && p.id !== userId && !seen.has(p.id)) seen.set(p.id, p);
     }
-    for (const c of classTeachers ?? []) {
+    for (const c of classTeachers) {
       const p = (c as any).profiles;
       if (p && p.id !== userId && !seen.has(p.id)) seen.set(p.id, p);
     }

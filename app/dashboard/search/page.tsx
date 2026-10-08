@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/actions/authGuards";
 import { searchNotes } from "@/lib/actions/search";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SearchBox } from "@/components/SearchBox";
+import { splitForHighlight } from "@/lib/plainText";
 
 export default async function SearchPage({
   searchParams,
@@ -45,7 +46,17 @@ export default async function SearchPage({
             >
               <p className="text-sm font-medium text-ink">{r.topicTitle}</p>
               <p className="text-xs text-ink-soft">{r.subjectName}</p>
-              <p className="mt-1 text-sm text-ink-soft">{r.snippet}</p>
+              <p className="mt-1 text-sm text-ink-soft">
+                {splitForHighlight(r.snippet, query).map((part, i) =>
+                  part.match ? (
+                    <mark key={i} className="rounded bg-marigold/30 px-0.5 text-ink">
+                      {part.text}
+                    </mark>
+                  ) : (
+                    <span key={i}>{part.text}</span>
+                  )
+                )}
+              </p>
             </Link>
           </li>
         ))}

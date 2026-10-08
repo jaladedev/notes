@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
+import { buildSnippet } from "@/lib/plainText";
 
 export type NoteSearchResult = {
   noteId: string;
@@ -11,28 +12,6 @@ export type NoteSearchResult = {
   subjectName: string;
   snippet: string;
 };
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function buildSnippet(content: string, query: string, radius = 80): string {
-  const plain = stripHtml(content);
-  const lower = plain.toLowerCase();
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  let index = -1;
-  for (const w of words) {
-    const i = lower.indexOf(w);
-    if (i !== -1) {
-      index = i;
-      break;
-    }
-  }
-  if (index === -1) return plain.slice(0, radius * 2);
-  const start = Math.max(0, index - radius);
-  const end = Math.min(plain.length, index + radius);
-  return `${start > 0 ? "…" : ""}${plain.slice(start, end)}${end < plain.length ? "…" : ""}`;
-}
 
 /**
  * Full-text search over notes the caller can already read. Relies
