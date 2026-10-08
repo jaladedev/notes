@@ -8,6 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { ClassRosterPanel } from "@/components/admin/ClassRosterPanel";
+import { ClassTeachersPanel } from "@/components/admin/ClassTeachersPanel";
 import { PromoteClassPanel } from "@/components/admin/PromoteClassPanel";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
@@ -60,6 +61,27 @@ export default async function AdminClassPage({
   const { data: subjectRows } = await supabase.from("subjects").select("id, name").order("name");
   const subjects = subjectRows ?? [];
 
+  const [{ data: teacherRows }, { data: assignmentRows }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("role", "teacher")
+      .eq("is_active", true)
+      .order("full_name"),
+    supabase
+      .from("class_subject_teachers")
+      .select("subject_id, teacher_id, profiles(full_name)")
+      .eq("class_id", classId),
+  ]);
+  const panelSubjects = subjects.map((sub: any) => ({
+    id: sub.id,
+    name: sub.name,
+    teachers: (assignmentRows ?? [])
+      .filter((a: any) => a.subject_id === sub.id)
+      .map((a: any) => ({ id: a.teacher_id, name: a.profiles?.full_name ?? "Unnamed teacher" })),
+  }));
+  const allTeachers = (teacherRows ?? []).map((t: any) => ({ id: t.id, name: t.full_name }));
+
   const { data: otherClasses } = await supabase
     .from("classes")
     .select("id, name")
@@ -78,6 +100,8 @@ export default async function AdminClassPage({
       <h1 className="font-display text-xl font-semibold text-ink">{klass.name}</h1>
 
       <ClassRosterPanel classId={classId} members={(members ?? []) as any} candidates={candidates} />
+
+      <ClassTeachersPanel classId={classId} subjects={panelSubjects} allTeachers={allTeachers} />
 
       <PromoteClassPanel
         classId={classId}

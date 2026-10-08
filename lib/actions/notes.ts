@@ -566,6 +566,91 @@ export async function promoteClass(
   });
 }
 
+export async function assignTeacherToClassSubject(
+  ...args: Parameters<typeof assignTeacherToClassSubjectImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof assignTeacherToClassSubjectImpl>>>> {
+  return toResult(() => assignTeacherToClassSubjectImpl(...args));
+}
+
+/**
+ * Make a teacher responsible for one subject in one class. If they aren't
+ * already assigned to the subject itself (teacher_subjects), that's added
+ * too, so they can open and write its notes.
+ */
+async function assignTeacherToClassSubjectImpl(classId: string, subjectId: string, teacherId: string) {
+  const admin_ = await assertGlobalRole(["admin"], "Only an admin can assign teachers.");
+  const admin = createAdminClient();
+
+  const { data: teacher, error: lookupError } = await admin
+    .from("profiles")
+    .select("id, role, is_active")
+    .eq("id", teacherId)
+    .maybeSingle();
+  if (lookupError) throwDbError(lookupError);
+  if (!teacher || teacher.role !== "teacher") throw new Error("Choose a teacher account.");
+  if (!teacher.is_active) throw new Error("That teacher's account is deactivated.");
+
+  const { data: existing, error: existingError } = await admin
+    .from("teacher_subjects")
+    .select("profile_id")
+    .eq("subject_id", subjectId)
+    .eq("profile_id", teacherId)
+    .maybeSingle();
+  if (existingError) throwDbError(existingError);
+  if (!existing) {
+    const { error: subjectError } = await admin
+      .from("teacher_subjects")
+      .insert({ subject_id: subjectId, profile_id: teacherId, role: "teacher" });
+    if (subjectError) throwDbError(subjectError);
+  }
+
+  const { error } = await admin
+    .from("class_subject_teachers")
+    .upsert(
+      { class_id: classId, subject_id: subjectId, teacher_id: teacherId },
+      { onConflict: "class_id,subject_id,teacher_id" }
+    );
+  if (error) throwDbError(error);
+
+  await writeAuditLog({
+    actorId: admin_.id,
+    action: "class.teacher_assign",
+    targetType: "class",
+    targetId: classId,
+    metadata: { subjectId, teacherId },
+  });
+  revalidatePath(`/dashboard/admin/classes/${classId}`);
+  revalidatePath(`/dashboard/admin/subjects/${subjectId}`);
+}
+
+export async function removeTeacherFromClassSubject(
+  ...args: Parameters<typeof removeTeacherFromClassSubjectImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof removeTeacherFromClassSubjectImpl>>>> {
+  return toResult(() => removeTeacherFromClassSubjectImpl(...args));
+}
+
+async function removeTeacherFromClassSubjectImpl(classId: string, subjectId: string, teacherId: string) {
+  const admin_ = await assertGlobalRole(["admin"], "Only an admin can assign teachers.");
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("class_subject_teachers")
+    .delete()
+    .eq("class_id", classId)
+    .eq("subject_id", subjectId)
+    .eq("teacher_id", teacherId);
+  if (error) throwDbError(error);
+
+  await writeAuditLog({
+    actorId: admin_.id,
+    action: "class.teacher_remove",
+    targetType: "class",
+    targetId: classId,
+    metadata: { subjectId, teacherId },
+  });
+  revalidatePath(`/dashboard/admin/classes/${classId}`);
+  revalidatePath(`/dashboard/admin/subjects/${subjectId}`);
+}
+
 export async function createSubject(
   ...args: Parameters<typeof createSubjectImpl>
 ): Promise<ActionResult<{ id: string; name: string }>> {

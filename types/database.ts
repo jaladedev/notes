@@ -41,6 +41,7 @@ export type Database = {
       | "class_members"
       | "subjects"
       | "teacher_subjects"
+      | "class_subject_teachers"
       | "topics"
       | "topic_notes"
       | "topic_note_drafts"
