@@ -44,12 +44,62 @@ export default async function TeacherSubjectPage({
     if (!latestStatusByTopic.has(n.topic_id)) latestStatusByTopic.set(n.topic_id, n.status);
   }
 
-  const groups = new Map<string, { label: string; topics: NonNullable<typeof topics> }>();
-  for (const t of topics ?? []) {
+  const { data: settings } = await supabase
+    .from("settings")
+    .select("current_academic_year, current_term")
+    .maybeSingle();
+  const currentYear = (settings as any)?.current_academic_year as string | null | undefined;
+  const currentTerm = (settings as any)?.current_term as number | null | undefined;
+  const gated = Boolean(currentYear && currentTerm);
+
+  const groups = new Map<
+    string,
+    { label: string; isCurrent: boolean; topics: NonNullable<typeof topics> }
+  >();
+  const sortedTopics = [...(topics ?? [])].sort(
+    (a, b) => (a.week_number ?? 99) - (b.week_number ?? 99) || a.sequence_order - b.sequence_order
+  );
+  for (const t of sortedTopics) {
     const key = `${t.education_level}-${t.level_number}-${t.academic_year}-${t.term}`;
     const label = `${t.education_level?.toUpperCase()} ${t.level_number} · ${t.academic_year} · Term ${t.term}`;
-    if (!groups.has(key)) groups.set(key, { label, topics: [] });
+    const isCurrent = !gated || (t.academic_year === currentYear && t.term === currentTerm);
+    if (!groups.has(key)) groups.set(key, { label, isCurrent, topics: [] });
     groups.get(key)!.topics.push(t);
+  }
+
+  const entries = [...groups.entries()];
+  const currentGroups = entries.filter(([, g]) => g.isCurrent);
+  const otherGroups = entries.filter(([, g]) => !g.isCurrent);
+
+  function renderGroup(key: string, group: (typeof entries)[number][1]) {
+    return (
+      <div key={key} className="mb-6">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">{group.label}</h2>
+        <ul className="space-y-2">
+          {group.topics.map((topic) => {
+            const status = latestStatusByTopic.get(topic.id);
+            return (
+              <li key={topic.id}>
+                <Link
+                  href={`/dashboard/teacher/notes/${topic.id}`}
+                  className="flex items-center justify-between rounded-lg border border-rule bg-white p-3 text-ink hover:border-marigold"
+                >
+                  <span>
+                    {topic.title}
+                    {topic.week_number != null && (
+                      <span className="ml-2 text-xs text-ink-soft">Week {topic.week_number}</span>
+                    )}
+                  </span>
+                  <span className="text-xs uppercase tracking-wide text-ink-soft">
+                    {status ?? "unwritten"}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
   }
 
   return (
@@ -69,37 +119,23 @@ export default async function TeacherSubjectPage({
 
       {groups.size === 0 ? (
         <p className="text-sm text-ink-soft">
-          No topics yet for this subject. Create one directly in Supabase for now.
+          No topics yet for this subject. Ask an admin to add topics under Admin → Subjects.
         </p>
       ) : (
-        [...groups.entries()].map(([key, group]) => (
-          <div key={key} className="mb-6">
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-soft">{group.label}</h2>
-            <ul className="space-y-2">
-              {group.topics.map((topic) => {
-                const status = latestStatusByTopic.get(topic.id);
-                return (
-                  <li key={topic.id}>
-                    <Link
-                      href={`/dashboard/teacher/notes/${topic.id}`}
-                      className="flex items-center justify-between rounded-lg border border-rule bg-white p-3 text-ink hover:border-marigold"
-                    >
-                      <span>
-                        {topic.title}
-                        {topic.week_number != null && (
-                          <span className="ml-2 text-xs text-ink-soft">Week {topic.week_number}</span>
-                        )}
-                      </span>
-                      <span className="text-xs uppercase tracking-wide text-ink-soft">
-                        {status ?? "unwritten"}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))
+        <>
+          {gated && currentGroups.length === 0 && (
+            <p className="mb-4 text-sm text-ink-soft">No topics for the current term yet.</p>
+          )}
+          {currentGroups.map(([key, group]) => renderGroup(key, group))}
+          {otherGroups.length > 0 && (
+            <details className="mt-2 rounded-lg border border-rule bg-white p-3">
+              <summary className="cursor-pointer text-sm font-medium text-ink">
+                Other terms ({otherGroups.length})
+              </summary>
+              <div className="mt-3">{otherGroups.map(([key, group]) => renderGroup(key, group))}</div>
+            </details>
+          )}
+        </>
       )}
     </div>
   );
