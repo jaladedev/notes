@@ -32,24 +32,9 @@ export default async function AdminClassPage({
     .select("profile_id, profiles(full_name)")
     .eq("class_id", classId);
 
-  // Subjects with at least one topic at this class's level -- what
-  // students in this class can actually read (notes are shared by level).
-  const { data: levelTopics } =
-    klass.education_level && klass.level_number
-      ? await supabase
-          .from("topics")
-          .select("subject_id, subjects(id, name)")
-          .eq("education_level", klass.education_level)
-          .eq("level_number", klass.level_number)
-      : { data: [] };
-  const seenSubjects = new Set<string>();
-  const subjects = (levelTopics ?? [])
-    .map((t: any) => t.subjects)
-    .filter((s: any) => {
-      if (!s || seenSubjects.has(s.id)) return false;
-      seenSubjects.add(s.id);
-      return true;
-    });
+  // Every subject is linked to every class automatically.
+  const { data: subjectRows } = await supabase.from("subjects").select("id, name").order("name");
+  const subjects = subjectRows ?? [];
 
   const { data: otherClasses } = await supabase
     .from("classes")
@@ -79,7 +64,7 @@ export default async function AdminClassPage({
 
       <section className="rounded-xl border border-rule bg-white p-4">
         <h2 className="mb-3 font-display text-lg font-semibold text-ink">
-          Subjects at this level ({subjects.length})
+          Subjects ({subjects.length})
         </h2>
         <ul className="space-y-1">
           {subjects.map((s: any) => (
@@ -93,11 +78,7 @@ export default async function AdminClassPage({
             </li>
           ))}
           {subjects.length === 0 && (
-            <p className="text-sm text-ink-soft">
-              {klass.education_level && klass.level_number
-                ? "No subject has any topics at this level yet."
-                : "Set this class's education level and level number to see its subjects."}
-            </p>
+            <p className="text-sm text-ink-soft">No subjects have been created yet.</p>
           )}
         </ul>
       </section>

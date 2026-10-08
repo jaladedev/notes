@@ -29,21 +29,10 @@ export default async function StudentLevelPage({
   );
   if (!atThisLevel) notFound();
 
-  const { data: subjects } = await supabase
-    .from("topics")
-    .select("subject_id, subjects(id, name)")
-    .eq("education_level", level)
-    .eq("level_number", Number(levelNumber));
-
-  const seen = new Set<string>();
-  const subjectList = (subjects ?? [])
-    .map((t: any) => t.subjects)
-    .filter((s: any) => {
-      if (!s || seen.has(s.id)) return false;
-      seen.add(s.id);
-      return true;
-    })
-    .sort((a: any, b: any) => a.name.localeCompare(b.name));
+  // Every subject is linked to every class automatically: list all subjects,
+  // not just the ones that already have topics at this level.
+  const { data: subjects } = await supabase.from("subjects").select("id, name").order("name");
+  const subjectList = subjects ?? [];
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
@@ -59,7 +48,7 @@ export default async function StudentLevelPage({
       </div>
 
       {subjectList.length === 0 ? (
-        <p className="text-sm text-ink-soft">Nothing published here yet.</p>
+        <p className="text-sm text-ink-soft">No subjects have been created yet.</p>
       ) : (
         <ul className="space-y-2">
           {subjectList.map((s: any) => (
