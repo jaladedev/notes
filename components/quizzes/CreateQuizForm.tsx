@@ -72,12 +72,16 @@ export function CreateQuizForm({ topicId }: { topicId: string }) {
     }
     startTransition(async () => {
       try {
-        await createQuizWithQuestions({
+        const result = await createQuizWithQuestions({
           topicId,
           title,
           timeLimitSeconds: timeLimit ? Number(timeLimit) * 60 : undefined,
           questions,
         });
+        if (!result.ok) {
+          emitToast(result.error, "error");
+          return;
+        }
         setTitle("");
         setTimeLimit("");
         setQuestions([emptyQuestion()]);

@@ -11,7 +11,13 @@ import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
 
-export async function createQuizWithQuestions(input: {
+export async function createQuizWithQuestions(
+  ...args: Parameters<typeof createQuizWithQuestionsImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof createQuizWithQuestionsImpl>>>> {
+  return toResult(() => createQuizWithQuestionsImpl(...args));
+}
+
+async function createQuizWithQuestionsImpl(input: {
   topicId: string;
   title: string;
   timeLimitSeconds?: number;
@@ -62,7 +68,13 @@ export async function createQuizWithQuestions(input: {
   return { quizId: quiz!.id };
 }
 
-export async function setQuizPublished(quizId: string, published: boolean) {
+export async function setQuizPublished(
+  ...args: Parameters<typeof setQuizPublishedImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof setQuizPublishedImpl>>>> {
+  return toResult(() => setQuizPublishedImpl(...args));
+}
+
+async function setQuizPublishedImpl(quizId: string, published: boolean) {
   const { id: userId } = await requireUser();
   const supabase = createClient();
 
@@ -76,7 +88,13 @@ export async function setQuizPublished(quizId: string, published: boolean) {
   }
 }
 
-export async function startQuizAttempt(quizId: string) {
+export async function startQuizAttempt(
+  ...args: Parameters<typeof startQuizAttemptImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof startQuizAttemptImpl>>>> {
+  return toResult(() => startQuizAttemptImpl(...args));
+}
+
+async function startQuizAttemptImpl(quizId: string) {
   const { id: studentId } = await requireUser();
   const supabase = createClient();
 

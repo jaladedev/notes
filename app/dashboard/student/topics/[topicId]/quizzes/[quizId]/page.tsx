@@ -37,8 +37,15 @@ export default async function StudentQuizAttemptPage({
     .maybeSingle();
 
   if (!attempt) {
-    const { attemptId } = await startQuizAttempt(quizId);
-    attempt = { id: attemptId, submitted_at: null, score: null, total_points: null };
+    const started = await startQuizAttempt(quizId);
+    if (!started.ok) {
+      return (
+        <div className="mx-auto max-w-2xl p-4 sm:p-6">
+          <p className="rounded-lg bg-paper p-3 text-sm text-ink">{started.error}</p>
+        </div>
+      );
+    }
+    attempt = { id: started.data.attemptId, submitted_at: null, score: null, total_points: null };
   }
 
   // Never select is_correct here -- a student must not be able to see

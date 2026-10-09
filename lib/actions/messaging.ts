@@ -54,7 +54,13 @@ async function getOrCreateDirectConversationImpl(otherProfileId: string) {
   return { conversationId: conversation!.id };
 }
 
-export async function sendMessage(conversationId: string, body: string) {
+export async function sendMessage(
+  ...args: Parameters<typeof sendMessageImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof sendMessageImpl>>>> {
+  return toResult(() => sendMessageImpl(...args));
+}
+
+async function sendMessageImpl(conversationId: string, body: string) {
   const { id: userId } = await requireUser();
   const supabase = createClient();
   const { error } = await supabase
@@ -70,7 +76,13 @@ export async function sendMessage(conversationId: string, body: string) {
 }
 
 /** Marks a conversation as read up to now for the current user. */
-export async function markConversationRead(conversationId: string) {
+export async function markConversationRead(
+  ...args: Parameters<typeof markConversationReadImpl>
+): Promise<ActionResult<void>> {
+  return toResult(() => markConversationReadImpl(...args));
+}
+
+async function markConversationReadImpl(conversationId: string) {
   const { id: userId } = await requireUser();
   const supabase = createClient();
   const { error } = await supabase

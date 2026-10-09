@@ -40,7 +40,9 @@ export function MessageThread({
           // person is read on arrival: mark it, then refresh the nav badge.
           if ((payload.new as Message).sender_id !== currentUserId) {
             markConversationRead(conversationId)
-              .then(requestNavRefresh)
+              .then((res) => {
+                if (res.ok) requestNavRefresh();
+              })
               .catch(() => {});
           }
           setMessages((current) =>
@@ -66,9 +68,14 @@ export function MessageThread({
     setBody("");
     startTransition(async () => {
       try {
-        await sendMessage(conversationId, text);
+        const result = await sendMessage(conversationId, text);
+        if (!result.ok) {
+          emitToast(result.error, "error");
+          setBody((current) => current || text); // put the message back so it isn't lost
+        }
       } catch (err: unknown) {
         emitToast(err instanceof Error ? err.message : "Couldn't send that message.", "error");
+        setBody((current) => current || text);
       }
     });
   }

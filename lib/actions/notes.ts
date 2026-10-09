@@ -104,7 +104,13 @@ async function saveTopicNoteImpl(
 }
 
 /** Periodic autosave, upserting onto a single scratch row per (topic, author). */
-export async function saveTopicNoteDraft(topicId: string, content: string) {
+export async function saveTopicNoteDraft(
+  ...args: Parameters<typeof saveTopicNoteDraftImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof saveTopicNoteDraftImpl>>>> {
+  return toResult(() => saveTopicNoteDraftImpl(...args));
+}
+
+async function saveTopicNoteDraftImpl(topicId: string, content: string) {
   const { id: teacherId } = await requireUser();
   const supabase = createClient();
 
@@ -130,7 +136,13 @@ export async function getTopicNoteDraft(topicId: string) {
   return data;
 }
 
-export async function clearTopicNoteDraft(topicId: string) {
+export async function clearTopicNoteDraft(
+  ...args: Parameters<typeof clearTopicNoteDraftImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof clearTopicNoteDraftImpl>>>> {
+  return toResult(() => clearTopicNoteDraftImpl(...args));
+}
+
+async function clearTopicNoteDraftImpl(topicId: string) {
   const { id: teacherId } = await requireUser();
   const supabase = createClient();
   await supabase
@@ -853,7 +865,13 @@ async function createTopicImpl(input: {
   return topic;
 }
 
-export async function renameTopic(topicId: string, title: string) {
+export async function renameTopic(
+  ...args: Parameters<typeof renameTopicImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof renameTopicImpl>>>> {
+  return toResult(() => renameTopicImpl(...args));
+}
+
+async function renameTopicImpl(topicId: string, title: string) {
   const supabase = createClient();
   const { data: topic } = await supabase.from("topics").select("subject_id").eq("id", topicId).single();
   if (!topic) throw new Error("Topic not found.");
@@ -868,7 +886,13 @@ export async function renameTopic(topicId: string, title: string) {
   revalidatePath(`/dashboard/teacher/notes/${topicId}`);
 }
 
-export async function deleteTopic(topicId: string) {
+export async function deleteTopic(
+  ...args: Parameters<typeof deleteTopicImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof deleteTopicImpl>>>> {
+  return toResult(() => deleteTopicImpl(...args));
+}
+
+async function deleteTopicImpl(topicId: string) {
   const supabase = createClient();
   const { data: topic } = await supabase.from("topics").select("subject_id").eq("id", topicId).single();
   if (!topic) throw new Error("Topic not found.");

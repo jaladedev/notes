@@ -85,7 +85,11 @@ export function useNoteAutosave(
       const content = getMarkdown();
       setAutosaveStatus("saving");
       saveTopicNoteDraft(topicId, content)
-        .then(() => {
+        .then((res) => {
+          if (!res.ok) {
+            setAutosaveStatus("error");
+            return;
+          }
           setAutosaveStatus("saved");
           setLastAutosaveAt(new Date());
         })

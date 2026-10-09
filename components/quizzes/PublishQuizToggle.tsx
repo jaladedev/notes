@@ -12,7 +12,11 @@ export function PublishQuizToggle({ quizId, published }: { quizId: string; publi
   function handleClick() {
     startTransition(async () => {
       try {
-        await setQuizPublished(quizId, !published);
+        const result = await setQuizPublished(quizId, !published);
+        if (!result.ok) {
+          emitToast(result.error, "error");
+          return;
+        }
         router.refresh();
         emitToast(published ? "Quiz unpublished." : "Quiz published — students can now take it.", "success");
       } catch (err: unknown) {
