@@ -4,11 +4,13 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { assertSubjectRole } from "@/lib/actions/authGuards";
-import { CreateHomeworkForm } from "@/components/homework/CreateHomeworkForm";
+import { GiveHomeworkForm } from "@/components/homework/GiveHomeworkForm";
 import { GradeSubmissionForm } from "@/components/homework/GradeSubmissionForm";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { getDueStatus, DUE_STATUS_STYLES, DUE_STATUS_LABELS } from "@/lib/dueStatus";
 import { getProfileNames } from "@/lib/actions/studentNames";
+import { EditHomeworkForm } from "@/components/homework/EditHomeworkForm";
+import { getSchoolTimeZone } from "@/lib/schoolSettings";
 
 export default async function TeacherHomeworkPage({
   params,
@@ -33,6 +35,7 @@ export default async function TeacherHomeworkPage({
     .eq("topic_id", topicId)
     .order("created_at", { ascending: false });
 
+  const timeZone = await getSchoolTimeZone();
   const homeworkIds = (assignments ?? []).map((h) => h.id);
   const { data: submissions } = homeworkIds.length
     ? await supabase
@@ -65,7 +68,7 @@ export default async function TeacherHomeworkPage({
         <h1 className="font-display text-xl font-semibold text-ink">Homework</h1>
       </div>
 
-      <CreateHomeworkForm topicId={topicId} />
+      <GiveHomeworkForm topicId={topicId} />
 
       <div className="space-y-4">
         {(assignments ?? []).map((hw) => {
@@ -90,6 +93,14 @@ export default async function TeacherHomeworkPage({
                 </div>
               </div>
               {hw.instructions && <p className="mb-3 text-sm text-ink-soft">{hw.instructions}</p>}
+              <div className="mb-3">
+                <EditHomeworkForm
+                  homeworkId={hw.id}
+                  topicId={topicId}
+                  timeZone={timeZone}
+                  initial={{ title: hw.title, instructions: hw.instructions, dueAt: hw.due_at }}
+                />
+              </div>
 
               <p className="mb-2 text-xs uppercase tracking-wide text-ink-soft">
                 {subs.length} submission{subs.length === 1 ? "" : "s"}

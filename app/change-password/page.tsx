@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import { changeTemporaryPassword } from "@/lib/actions/accountAdmin";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export default function ChangePasswordPage() {
   const [password, setPassword] = useState("");
@@ -57,14 +58,13 @@ export default function ChangePasswordPage() {
             <label htmlFor="password" className="mb-1 block text-sm font-medium text-ink">
               New password
             </label>
-            <input
+            <PasswordInput
               id="password"
-              type="password"
+              autoComplete="new-password"
               required
               minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-rule px-3 py-2 text-ink"
               placeholder="At least 8 characters"
               title="Choose a new password, at least 8 characters"
             />
@@ -73,14 +73,13 @@ export default function ChangePasswordPage() {
             <label htmlFor="confirm" className="mb-1 block text-sm font-medium text-ink">
               Confirm password
             </label>
-            <input
+            <PasswordInput
               id="confirm"
-              type="password"
+              autoComplete="new-password"
               required
               minLength={8}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="w-full rounded-lg border border-rule px-3 py-2 text-ink"
               placeholder="Re-enter your new password"
               title="Re-enter the same new password to confirm"
             />

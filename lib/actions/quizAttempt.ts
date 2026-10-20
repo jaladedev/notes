@@ -1,8 +1,11 @@
 "use server";
 
-// create/publish a quiz (staff) and take/submit an attempt (student).
-// Scoring itself happens server-side in submit_quiz_attempt() (see
-// 0007_feature_expansion.sql) -- never trust a client-submitted score.
+// create/edit/publish/schedule a quiz and grade essays (staff), and
+// take/submit an attempt (student). Scoring happens server-side in
+// submit_quiz_attempt() (0025) and essay grades in grade_essay_answer()
+// (0027) -- never trust a client-submitted score. Creating and replacing
+// questions go through single-transaction RPCs (0029, 0030) so a failure
+// can't leave a half-built quiz.
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -10,6 +13,7 @@ import { assertSubjectRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
+import { toRpcQuestions, validateQuiz, type QuizQuestionInput } from "@/lib/quizValidation";
 
 export async function createQuizWithQuestions(
   ...args: Parameters<typeof createQuizWithQuestionsImpl>
@@ -17,55 +21,100 @@ export async function createQuizWithQuestions(
   return toResult(() => createQuizWithQuestionsImpl(...args));
 }
 
-async function createQuizWithQuestionsImpl(input: {
-  topicId: string;
+export type QuizDefinitionInput = {
   title: string;
-  timeLimitSeconds?: number;
-  questions: { prompt: string; points?: number; options: { label: string; isCorrect: boolean }[] }[];
-}) {
+  timeLimitSeconds?: number | null;
+  opensAt?: string | null;
+  closesAt?: string | null;
+  shuffleQuestions?: boolean;
+  questions: QuizQuestionInput[];
+};
+
+async function createQuizWithQuestionsImpl(input: QuizDefinitionInput & { topicId: string }) {
   const supabase = createClient();
   const { data: topic } = await supabase.from("topics").select("subject_id").eq("id", input.topicId).single();
   if (!topic) throw new Error("Topic not found.");
-  const { id: userId } = await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
+  await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
-  const { data: quiz, error: quizError } = await supabase
-    .from("quizzes")
-    .insert({
-      topic_id: input.topicId,
-      title: input.title,
-      time_limit_seconds: input.timeLimitSeconds ?? null,
-      created_by: userId,
-    })
-    .select("id")
-    .single();
-  if (quizError) throwDbError(quizError);
+  const problem = validateQuiz(input);
+  if (problem) throw new Error(problem);
 
-  for (const [qIndex, q] of input.questions.entries()) {
-    const { data: question, error: qError } = await supabase
-      .from("quiz_questions")
-      .insert({
-        quiz_id: quiz!.id,
-        prompt: q.prompt,
-        points: q.points ?? 1,
-        sequence_order: qIndex,
-      })
-      .select("id")
-      .single();
-    if (qError) throwDbError(qError);
-
-    const { error: optError } = await supabase.from("quiz_options").insert(
-      q.options.map((opt, oIndex) => ({
-        question_id: question!.id,
-        label: opt.label,
-        is_correct: opt.isCorrect,
-        sequence_order: oIndex,
-      }))
-    );
-    if (optError) throwDbError(optError);
-  }
+  const { data: quizId, error } = await supabase.rpc("create_quiz_with_questions", {
+    p_topic_id: input.topicId,
+    p_title: input.title.trim(),
+    p_time_limit_seconds: input.timeLimitSeconds ?? null,
+    p_questions: toRpcQuestions(input.questions),
+    p_opens_at: input.opensAt ?? null,
+    p_closes_at: input.closesAt ?? null,
+    p_shuffle_questions: input.shuffleQuestions ?? false,
+  });
+  if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/teacher/notes/${input.topicId}`);
-  return { quizId: quiz!.id };
+  revalidatePath(`/dashboard/teacher/notes/${input.topicId}/quizzes`);
+  return { quizId: quizId as string };
+}
+
+export async function replaceQuizQuestions(
+  ...args: Parameters<typeof replaceQuizQuestionsImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof replaceQuizQuestionsImpl>>>> {
+  return toResult(() => replaceQuizQuestionsImpl(...args));
+}
+
+/** Edits a quiz's title, settings and whole question set. Refused by the database once any student has started it. */
+async function replaceQuizQuestionsImpl(input: QuizDefinitionInput & { quizId: string; topicId: string }) {
+  const { id: userId } = await requireUser();
+  const supabase = createClient();
+
+  const problem = validateQuiz(input);
+  if (problem) throw new Error(problem);
+
+  const { error } = await supabase.rpc("replace_quiz_questions", {
+    p_quiz_id: input.quizId,
+    p_title: input.title.trim(),
+    p_time_limit_seconds: input.timeLimitSeconds ?? null,
+    p_questions: toRpcQuestions(input.questions),
+    p_opens_at: input.opensAt ?? null,
+    p_closes_at: input.closesAt ?? null,
+    p_shuffle_questions: input.shuffleQuestions ?? false,
+  });
+  if (error) throwDbError(error);
+
+  await writeAuditLog({ actorId: userId, action: "quiz.edit", targetType: "quiz", targetId: input.quizId });
+  revalidatePath(`/dashboard/teacher/notes/${input.topicId}/quizzes`);
+  return { quizId: input.quizId };
+}
+
+export async function updateQuizSettings(
+  ...args: Parameters<typeof updateQuizSettingsImpl>
+): Promise<ActionResult<void>> {
+  return toResult(() => updateQuizSettingsImpl(...args));
+}
+
+/** Window and shuffle settings -- safe to change at any time, even after attempts exist. */
+async function updateQuizSettingsImpl(input: {
+  quizId: string;
+  topicId: string;
+  opensAt: string | null;
+  closesAt: string | null;
+  shuffleQuestions: boolean;
+}) {
+  await requireUser();
+  if (input.opensAt && input.closesAt && Date.parse(input.closesAt) <= Date.parse(input.opensAt)) {
+    throw new Error("The quiz must close after it opens.");
+  }
+  const supabase = createClient();
+  // RLS (quizzes_write_staff) restricts this to the quiz's subject staff.
+  const { error } = await supabase
+    .from("quizzes")
+    .update({
+      opens_at: input.opensAt,
+      closes_at: input.closesAt,
+      shuffle_questions: input.shuffleQuestions,
+    })
+    .eq("id", input.quizId);
+  if (error) throwDbError(error);
+  revalidatePath(`/dashboard/teacher/notes/${input.topicId}/quizzes`);
 }
 
 export async function setQuizPublished(
@@ -127,11 +176,35 @@ export async function answerQuizQuestion(
   return toResult(() => answerQuizQuestionImpl(...args));
 }
 
-async function answerQuizQuestionImpl(input: { attemptId: string; questionId: string; optionId: string }) {
+const MAX_TEXT_ANSWER = 20000;
+
+/**
+ * Saves one answer. Exactly the field for the question's type is stored and
+ * the others are cleared, so switching between answers never leaves stale
+ * data from another type on the row. The database trigger (0027) rejects
+ * writes after submission or after the window closes, and discards any
+ * grading columns -- this can only ever record the student's own answer.
+ */
+async function answerQuizQuestionImpl(input: {
+  attemptId: string;
+  questionId: string;
+  optionId?: string | null;
+  textAnswer?: string | null;
+  matchingAnswer?: Record<string, string> | null;
+}) {
+  if (input.textAnswer != null && input.textAnswer.length > MAX_TEXT_ANSWER) {
+    throw new Error(`Answers can be at most ${MAX_TEXT_ANSWER.toLocaleString()} characters.`);
+  }
   const supabase = createClient();
   // RLS (quiz_answers_own) restricts writes to the attempt's own student.
   const { error } = await supabase.from("quiz_answers").upsert(
-    { attempt_id: input.attemptId, question_id: input.questionId, option_id: input.optionId },
+    {
+      attempt_id: input.attemptId,
+      question_id: input.questionId,
+      option_id: input.optionId ?? null,
+      text_answer: input.textAnswer ?? null,
+      matching_answer: input.matchingAnswer ?? null,
+    },
     { onConflict: "attempt_id,question_id" }
   );
   if (error) throwDbError(error);
@@ -147,5 +220,42 @@ async function submitQuizAttemptImpl(attemptId: string) {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("submit_quiz_attempt", { p_attempt_id: attemptId });
   if (error) throwDbError(error);
-  return data?.[0] as { score: number; total_points: number } | undefined;
+  return data?.[0] as { score: number; total_points: number; needs_grading: boolean } | undefined;
+}
+
+export async function gradeEssayAnswer(
+  ...args: Parameters<typeof gradeEssayAnswerImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof gradeEssayAnswerImpl>>>> {
+  return toResult(() => gradeEssayAnswerImpl(...args));
+}
+
+async function gradeEssayAnswerImpl(input: {
+  attemptId: string;
+  questionId: string;
+  points: number;
+  feedback?: string;
+  topicId: string;
+  quizId: string;
+}) {
+  const { id: userId } = await requireUser();
+  if (!Number.isFinite(input.points) || input.points < 0) throw new Error("Enter a score of 0 or more.");
+  const supabase = createClient();
+  // The function checks the caller is staff for the quiz, the answer is an
+  // essay, and 0 <= points <= the question's maximum, then rescores the attempt.
+  const { data, error } = await supabase.rpc("grade_essay_answer", {
+    p_attempt_id: input.attemptId,
+    p_question_id: input.questionId,
+    p_points: input.points,
+    p_feedback: input.feedback ?? null,
+  });
+  if (error) throwDbError(error);
+  await writeAuditLog({
+    actorId: userId,
+    action: "quiz.grade_essay",
+    targetType: "quiz_attempt",
+    targetId: input.attemptId,
+  });
+  revalidatePath(`/dashboard/teacher/notes/${input.topicId}/quizzes/${input.quizId}/grade`);
+  revalidatePath(`/dashboard/teacher/notes/${input.topicId}/quizzes`);
+  return data?.[0] as { score: number; total_points: number; needs_grading: boolean } | undefined;
 }

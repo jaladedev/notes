@@ -6,6 +6,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { getSchoolTimeZone } from "@/lib/schoolSettings";
+import { describeQuizWindow } from "@/lib/quizWindow";
 
 export default async function StudentQuizzesPage({
   params,
@@ -25,7 +27,7 @@ export default async function StudentQuizzesPage({
 
   const { data: quizzes } = await supabase
     .from("quizzes")
-    .select("id, title, time_limit_seconds")
+    .select("id, title, time_limit_seconds, opens_at, closes_at")
     .eq("topic_id", topicId)
     .eq("published", true)
     .order("created_at", { ascending: false });
@@ -34,11 +36,12 @@ export default async function StudentQuizzesPage({
   const { data: myAttempts } = quizIds.length
     ? await supabase
         .from("quiz_attempts")
-        .select("id, quiz_id, submitted_at, score, total_points")
+        .select("id, quiz_id, submitted_at, score, total_points, needs_grading")
         .in("quiz_id", quizIds)
         .eq("student_id", studentId)
     : { data: [] };
 
+  const timeZone = await getSchoolTimeZone();
   const attemptByQuiz = new Map((myAttempts ?? []).map((a) => [a.quiz_id, a]));
 
   return (
@@ -65,10 +68,18 @@ export default async function StudentQuizzesPage({
             className="block rounded-lg border border-rule bg-white p-3 hover:border-marigold"
           >
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-ink">{q.title}</span>
+              <span>
+                <span className="text-sm font-medium text-ink">{q.title}</span>
+                {!done && describeQuizWindow(q.opens_at, q.closes_at, new Date(), timeZone) && (
+                  <span className="mt-0.5 block text-xs text-ink-soft">
+                    {describeQuizWindow(q.opens_at, q.closes_at, new Date(), timeZone)}
+                  </span>
+                )}
+              </span>
               {done ? (
                 <span className="text-xs text-leaf">
                   {attempt!.score} / {attempt!.total_points}
+                  {attempt!.needs_grading ? " (provisional)" : ""}
                 </span>
               ) : (
                 <span className="text-xs text-marigold-text">

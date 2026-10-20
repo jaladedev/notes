@@ -83,7 +83,74 @@ export type Database = {
       };
       submit_quiz_attempt: {
         Args: { p_attempt_id: string };
-        Returns: { score: number; total_points: number }[];
+        Returns: { score: number; total_points: number; needs_grading: boolean }[];
+      };
+      get_quiz_attempt_questions: {
+        Args: { p_attempt_id: string };
+        Returns: {
+          question_id: string;
+          question_type: string;
+          prompt: string;
+          points: number;
+          sequence_order: number;
+          options: { id: string; label: string }[];
+          choices: string[];
+          option_id: string | null;
+          text_answer: string | null;
+          matching_answer: Record<string, string> | null;
+        }[];
+      };
+      get_quiz_attempt_review: {
+        Args: { p_attempt_id: string };
+        Returns: {
+          question_id: string;
+          question_type: string;
+          prompt: string;
+          points: number;
+          sequence_order: number;
+          options: { id: string; label: string; is_correct: boolean; match_text: string | null }[];
+          option_id: string | null;
+          text_answer: string | null;
+          matching_answer: Record<string, string> | null;
+          points_awarded: number | null;
+          feedback: string | null;
+        }[];
+      };
+      parent_children: {
+        Args: Record<string, never>;
+        Returns: { id: string; full_name: string }[];
+      };
+      search_topic_notes_prefix: {
+        Args: { p_query: string; p_limit?: number };
+        Returns: { id: string; rank: number }[];
+      };
+      grade_essay_answer: {
+        Args: { p_attempt_id: string; p_question_id: string; p_points: number; p_feedback?: string | null };
+        Returns: { score: number; total_points: number; needs_grading: boolean }[];
+      };
+      create_quiz_with_questions: {
+        Args: {
+          p_topic_id: string;
+          p_title: string;
+          p_time_limit_seconds: number | null;
+          p_questions: unknown;
+          p_opens_at?: string | null;
+          p_closes_at?: string | null;
+          p_shuffle_questions?: boolean;
+        };
+        Returns: string;
+      };
+      replace_quiz_questions: {
+        Args: {
+          p_quiz_id: string;
+          p_title: string;
+          p_time_limit_seconds: number | null;
+          p_questions: unknown;
+          p_opens_at?: string | null;
+          p_closes_at?: string | null;
+          p_shuffle_questions?: boolean;
+        };
+        Returns: undefined;
       };
     };
     Enums: {

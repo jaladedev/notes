@@ -4,3 +4,4 @@ deployments/
 .env.local
 *.env
 notes-delivery-plan.md
+supabase/.temp/

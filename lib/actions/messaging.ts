@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
+import { conversationBucket, latestVisible, type InboxView } from "@/lib/conversationState";
 
 /** Finds an existing 1:1 conversation between the two users, or creates one. */
 export async function getOrCreateDirectConversation(
@@ -75,6 +76,42 @@ async function sendMessageImpl(conversationId: string, body: string) {
     .eq("profile_id", userId);
 }
 
+/**
+ * Messages in a conversation at or after `afterIso` (the poll cursor), oldest
+ * first. `>=` rather than `>` so rows sharing the cursor's timestamp are not
+ * skipped; the client de-duplicates by id (see mergeMessages). Membership is
+ * enforced by RLS on `messages`, so a non-member simply gets an empty list.
+ */
+export async function fetchMessagesSince(
+  ...args: Parameters<typeof fetchMessagesSinceImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof fetchMessagesSinceImpl>>>> {
+  return toResult(() => fetchMessagesSinceImpl(...args));
+}
+
+async function fetchMessagesSinceImpl(conversationId: string, afterIso: string | null) {
+  const { id: userId } = await requireUser();
+  const supabase = createClient();
+  // A member who deleted this conversation never sees anything up to that
+  // moment, even when the poll has no cursor yet (an empty thread).
+  const { data: member } = await supabase
+    .from("conversation_members")
+    .select("deleted_at")
+    .eq("conversation_id", conversationId)
+    .eq("profile_id", userId)
+    .maybeSingle();
+  let query = supabase
+    .from("messages")
+    .select("id, sender_id, body, created_at")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true })
+    .limit(200);
+  if (member?.deleted_at) query = query.gt("created_at", member.deleted_at);
+  if (afterIso) query = query.gte("created_at", afterIso);
+  const { data, error } = await query;
+  if (error) throwDbError(error);
+  return (data ?? []) as { id: string; sender_id: string; body: string; created_at: string }[];
+}
+
 /** Marks a conversation as read up to now for the current user. */
 export async function markConversationRead(
   ...args: Parameters<typeof markConversationReadImpl>
@@ -85,12 +122,16 @@ export async function markConversationRead(
 async function markConversationReadImpl(conversationId: string) {
   const { id: userId } = await requireUser();
   const supabase = createClient();
-  const { error } = await supabase
+  // .select() so an update RLS filtered to zero rows is surfaced instead of
+  // silently doing nothing -- that is exactly how this was broken before 0033.
+  const { data, error } = await supabase
     .from("conversation_members")
     .update({ last_read_at: new Date().toISOString() })
     .eq("conversation_id", conversationId)
-    .eq("profile_id", userId);
+    .eq("profile_id", userId)
+    .select("conversation_id");
   if (error) throwDbError(error);
+  if (!data || data.length === 0) throw new Error("Conversation not found.");
 }
 
 /** Total number of conversations with at least one message from someone else after the caller last read it. */
@@ -100,22 +141,29 @@ export async function getUnreadMessageCount(): Promise<number> {
 
   const { data: memberships } = await supabase
     .from("conversation_members")
-    .select("conversation_id, last_read_at")
+    .select("conversation_id, last_read_at, archived_at, deleted_at")
     .eq("profile_id", userId);
   if (!memberships || memberships.length === 0) return 0;
 
-  const conversationIds = memberships.map((m) => m.conversation_id);
+  // Archived conversations don't badge (a new message un-archives them, so
+  // anything that matters resurfaces on its own). Deleted ones count only
+  // for messages that arrived after the deletion.
+  const memberById = new Map(memberships.map((m) => [m.conversation_id as string, m]));
+  const conversationIds = memberships.filter((m) => !m.archived_at).map((m) => m.conversation_id as string);
+  if (conversationIds.length === 0) return 0;
+
   const { data: messages } = await supabase
     .from("messages")
     .select("conversation_id, sender_id, created_at")
     .in("conversation_id", conversationIds)
     .neq("sender_id", userId);
 
-  const lastReadByConversation = new Map(memberships.map((m) => [m.conversation_id, m.last_read_at]));
   const unreadConversations = new Set<string>();
   for (const m of messages ?? []) {
-    const lastRead = lastReadByConversation.get(m.conversation_id);
-    if (!lastRead || new Date(m.created_at) > new Date(lastRead)) {
+    const member = memberById.get(m.conversation_id);
+    if (!member) continue;
+    if (member.deleted_at && m.created_at <= member.deleted_at) continue;
+    if (!member.last_read_at || new Date(m.created_at) > new Date(member.last_read_at)) {
       unreadConversations.add(m.conversation_id);
     }
   }
@@ -234,18 +282,23 @@ export async function getConversationParticipantNames(
   );
 }
 
-/** One row per conversation the caller belongs to, with the other participant's name and last message. */
-export async function listMyConversations() {
+/**
+ * One row per conversation in the requested view ("inbox" or "archived"),
+ * with the other participant's name and the last message the caller can
+ * still see. Conversations the caller deleted stay out unless something
+ * newer has arrived since.
+ */
+export async function listMyConversations(view: InboxView = "inbox") {
   const { id: userId } = await requireUser();
   const supabase = createClient();
 
   const { data: myConversations } = await supabase
     .from("conversation_members")
-    .select("conversation_id, last_read_at")
+    .select("conversation_id, last_read_at, archived_at, deleted_at")
     .eq("profile_id", userId);
-  const conversationIds = (myConversations ?? []).map((c) => c.conversation_id);
-  if (conversationIds.length === 0) return [];
-  const lastReadByConversation = new Map(myConversations!.map((c) => [c.conversation_id, c.last_read_at]));
+  if (!myConversations || myConversations.length === 0) return [];
+  const conversationIds = myConversations.map((c) => c.conversation_id as string);
+  const memberById = new Map(myConversations.map((c) => [c.conversation_id as string, c]));
 
   const admin = createAdminClient();
   const { data: allMembers } = await admin
@@ -253,15 +306,17 @@ export async function listMyConversations() {
     .select("conversation_id, profile_id, profiles(full_name)")
     .in("conversation_id", conversationIds);
 
-  const { data: lastMessages } = await supabase
+  const { data: messages } = await supabase
     .from("messages")
     .select("conversation_id, sender_id, body, created_at")
     .in("conversation_id", conversationIds)
     .order("created_at", { ascending: false });
 
-  const lastByConversation = new Map<string, { sender_id: string; body: string; created_at: string }>();
-  for (const m of lastMessages ?? []) {
-    if (!lastByConversation.has(m.conversation_id)) lastByConversation.set(m.conversation_id, m);
+  const byConversation = new Map<string, { conversation_id: string; sender_id: string; body: string; created_at: string }[]>();
+  for (const m of messages ?? []) {
+    const list = byConversation.get(m.conversation_id) ?? [];
+    list.push(m);
+    byConversation.set(m.conversation_id, list);
   }
 
   const otherByConversation = new Map<string, string>();
@@ -272,16 +327,49 @@ export async function listMyConversations() {
   }
 
   return conversationIds
-    .map((id) => {
-      const last = lastByConversation.get(id) ?? null;
-      const lastRead = lastReadByConversation.get(id);
-      const unread = !!last && last.sender_id !== userId && (!lastRead || new Date(last.created_at) > new Date(lastRead));
-      return {
-        id,
-        otherName: otherByConversation.get(id) ?? "Someone",
-        last,
-        unread,
-      };
+    .flatMap((id) => {
+      const member = memberById.get(id)!;
+      const last = latestVisible(byConversation.get(id) ?? [], member.deleted_at);
+      const bucket = conversationBucket(member, last?.created_at ?? null);
+      if (bucket !== view) return [];
+      const unread =
+        !!last && last.sender_id !== userId && (!member.last_read_at || new Date(last.created_at) > new Date(member.last_read_at));
+      return [{ id, otherName: otherByConversation.get(id) ?? "Someone", last, unread }];
     })
     .sort((a, b) => (b.last?.created_at ?? "").localeCompare(a.last?.created_at ?? ""));
+}
+
+type StateAction = "archive" | "unarchive" | "delete";
+
+/**
+ * Archive, restore, or delete a conversation from the caller's own view.
+ * Only the caller's membership row changes (RLS + column grants, 0033);
+ * the other person's inbox and the messages themselves are untouched.
+ */
+export async function setConversationState(
+  ...args: Parameters<typeof setConversationStateImpl>
+): Promise<ActionResult<void>> {
+  return toResult(() => setConversationStateImpl(...args));
+}
+
+async function setConversationStateImpl(conversationId: string, action: StateAction) {
+  const { id: userId } = await requireUser();
+  const supabase = createClient();
+  const now = new Date().toISOString();
+  const patch =
+    action === "archive"
+      ? { archived_at: now }
+      : action === "unarchive"
+        ? { archived_at: null }
+        : { deleted_at: now, archived_at: null };
+
+  // .select() so a row filtered out by RLS is reported, not silently ignored.
+  const { data, error } = await supabase
+    .from("conversation_members")
+    .update(patch)
+    .eq("conversation_id", conversationId)
+    .eq("profile_id", userId)
+    .select("conversation_id");
+  if (error) throwDbError(error);
+  if (!data || data.length === 0) throw new Error("Conversation not found.");
 }

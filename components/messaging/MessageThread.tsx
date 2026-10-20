@@ -1,16 +1,26 @@
 "use client";
 
-// Realtime message thread: subscribes to new rows in `messages` for
-// this conversation (server-side inserts and other tabs both arrive
-// this way), and sends via the sendMessage server action.
+// Message thread: polls for new rows in this conversation every few
+// seconds (see usePolling -- it pauses while the tab is hidden) and sends
+// via the sendMessage server action. Sent messages are merged in right
+// away rather than waiting for the next tick.
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { markConversationRead, sendMessage } from "@/lib/actions/messaging";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { fetchMessagesSince, markConversationRead, sendMessage } from "@/lib/actions/messaging";
+import { usePolling } from "@/lib/hooks/usePolling";
+import {
+  hasIncomingFromOthers,
+  mergeMessages,
+  newlyArrived,
+  pollCursor,
+  type PolledMessage,
+} from "@/lib/messagePolling";
 import { requestNavRefresh } from "@/lib/unread";
 import { emitToast } from "@/lib/toast";
 
-type Message = { id: string; sender_id: string; body: string; created_at: string };
+type Message = PolledMessage;
+
+const MESSAGE_POLL_MS = 4000;
 
 export function MessageThread({
   conversationId,
@@ -28,34 +38,30 @@ export function MessageThread({
   const [isPending, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`messages:${conversationId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${conversationId}` },
-        (payload) => {
-          // I'm looking at this conversation, so a message from the other
-          // person is read on arrival: mark it, then refresh the nav badge.
-          if ((payload.new as Message).sender_id !== currentUserId) {
-            markConversationRead(conversationId)
-              .then((res) => {
-                if (res.ok) requestNavRefresh();
-              })
-              .catch(() => {});
-          }
-          setMessages((current) =>
-            current.some((m) => m.id === payload.new.id) ? current : [...current, payload.new as Message]
-          );
-        }
-      )
-      .subscribe();
+  // Poll for new messages (replaces the old Realtime subscription). The
+  // cursor lives in a ref so each tick reads the latest value without
+  // re-creating the interval.
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+  const poll = useCallback(async () => {
+    const res = await fetchMessagesSince(conversationId, pollCursor(messagesRef.current));
+    if (!res.ok) throw new Error(res.error);
+    const fresh = newlyArrived(messagesRef.current, res.data);
+    if (fresh.length === 0) return;
+    // I'm looking at this conversation, so a message from the other
+    // person is read on arrival: mark it, then refresh the nav badge.
+    if (hasIncomingFromOthers(fresh, currentUserId)) {
+      markConversationRead(conversationId)
+        .then((r) => {
+          if (r.ok) requestNavRefresh();
+        })
+        .catch(() => {});
+    }
+    setMessages((current) => mergeMessages(current, res.data));
   }, [conversationId, currentUserId]);
+
+  usePolling(poll, MESSAGE_POLL_MS);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -72,7 +78,9 @@ export function MessageThread({
         if (!result.ok) {
           emitToast(result.error, "error");
           setBody((current) => current || text); // put the message back so it isn't lost
+          return;
         }
+        await poll().catch(() => {}); // show my own message without waiting for the next tick
       } catch (err: unknown) {
         emitToast(err instanceof Error ? err.message : "Couldn't send that message.", "error");
         setBody((current) => current || text);

@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavBadge } from "@/components/NavBadge";
-import { createClient } from "@/lib/supabase/client";
+import { usePolling } from "@/lib/hooks/usePolling";
 import { getNavBadgeCounts } from "@/lib/actions/notifications";
+
+const NAV_POLL_MS = 20000;
 
 export type NavItem = {
   label: string;
@@ -94,23 +96,11 @@ export function DashboardNav({
     };
   }, [refresh]);
 
-  // New messages in any of my conversations (Realtime only delivers rows
-  // RLS lets me see). The conversation that's open handles its own
-  // mark-as-read and then asks for a refresh, so skip it here.
-  useEffect(() => {
-    const supabase = createClient();
-    const channel = supabase
-      .channel("nav-unread-messages")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-        const conversationId = (payload.new as { conversation_id?: string }).conversation_id;
-        if (conversationId && pathnameRef.current === `/dashboard/messages/${conversationId}`) return;
-        void refresh();
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refresh]);
+  // New messages/announcements arrive by polling the badge counts (this
+  // replaces the old Realtime subscription). The conversation that's open
+  // handles its own mark-as-read and then asks for a refresh, so the
+  // count is simply re-read here on a slow interval.
+  usePolling(refresh, NAV_POLL_MS, { immediate: false });
 
   const badgeFor = (item: NavItem) => (item.badgeKey ? counts[item.badgeKey] : item.badge ?? 0);
   const totalUnread = counts.messages + counts.announcements;

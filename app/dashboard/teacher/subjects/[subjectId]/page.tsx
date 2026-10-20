@@ -4,9 +4,12 @@
 // is the natural grouping for the teacher's list too.
 
 import { notFound } from "next/navigation";
+import { formatWeekRange } from "@/lib/topicWeeks";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { assertSubjectRole } from "@/lib/actions/authGuards";
+import { getOverdueHomeworkForSubject } from "@/lib/actions/homeworkAlerts";
+import { StaffOverdueHomeworkPanel } from "@/components/homework/OverdueHomeworkPanel";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { getProfileNames } from "@/lib/actions/studentNames";
 import { getSchoolTimeZone } from "@/lib/actions/timetable";
@@ -26,7 +29,7 @@ export default async function TeacherSubjectPage({
 
   const { data: topics } = await supabase
     .from("topics")
-    .select("id, title, sequence_order, education_level, level_number, academic_year, term, week_number")
+    .select("id, title, sequence_order, education_level, level_number, academic_year, term, week_number, week_end_number, theme")
     .eq("subject_id", subjectId)
     .order("education_level", { ascending: true })
     .order("level_number", { ascending: true })
@@ -67,6 +70,8 @@ export default async function TeacherSubjectPage({
   const pendingNames = await getProfileNames(pending.map((p) => p.student_id));
   const schoolTz = pending.length ? await getSchoolTimeZone() : "UTC";
   const PENDING_SHOWN = 8;
+
+  const overdueHomework = await getOverdueHomeworkForSubject(subjectId);
 
   const { data: settings } = await supabase
     .from("settings")
@@ -111,8 +116,11 @@ export default async function TeacherSubjectPage({
                   <span>
                     {topic.title}
                     {topic.week_number != null && (
-                      <span className="ml-2 text-xs text-ink-soft">Week {topic.week_number}</span>
+                      <span className="ml-2 text-xs text-ink-soft">
+                        {formatWeekRange(topic.week_number, topic.week_end_number)}
+                      </span>
                     )}
+                    {topic.theme && <span className="ml-2 text-xs text-ink-soft">· {topic.theme}</span>}
                   </span>
                   <span className="text-xs uppercase tracking-wide text-ink-soft">
                     {status ?? "unwritten"}
@@ -140,6 +148,12 @@ export default async function TeacherSubjectPage({
           </Link>
         </div>
       </div>
+
+      {overdueHomework.length > 0 && (
+        <div className="mb-6">
+          <StaffOverdueHomeworkPanel items={overdueHomework} />
+        </div>
+      )}
 
       {pending.length > 0 && (
         <section className="mb-6 rounded-xl border border-marigold bg-white p-4">

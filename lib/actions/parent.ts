@@ -32,13 +32,11 @@ export async function getParentDigest(): Promise<ChildDigest[]> {
   const childIds = (links ?? []).map((l) => l.student_id);
   if (childIds.length === 0) return [];
 
-  // Names: profiles RLS only lets a user read their own row, so this
-  // needs the admin client -- gated above by "linked as my child", not
-  // by exposing every profile in the school.
-  const { data: childProfiles } = await admin
-    .from("profiles")
-    .select("id, full_name")
-    .in("id", childIds);
+  // Names: profiles RLS only lets a user read their own row, so they come
+  // from parent_children() (0034) -- a narrow SECURITY DEFINER function that
+  // returns just (id, full_name) for children linked to this parent, rather
+  // than the admin client or a row policy that would expose email and flags.
+  const { data: childProfiles } = await supabase.rpc("parent_children");
   const nameById = new Map((childProfiles ?? []).map((p) => [p.id, p.full_name]));
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();

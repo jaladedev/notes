@@ -31,6 +31,8 @@ type AuditAction =
   | "timetable.entry_clear"
   | "announcement.create"
   | "quiz.publish"
+  | "quiz.edit"
+  | "quiz.grade_essay"
   | "homework.grade";
 
 export async function writeAuditLog(input: {

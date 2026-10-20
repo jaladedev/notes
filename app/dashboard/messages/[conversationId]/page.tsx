@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/actions/authGuards";
 import { getConversationParticipantNames, markConversationRead } from "@/lib/actions/messaging";
 import { MessageThread } from "@/components/messaging/MessageThread";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { ConversationActions } from "@/components/messaging/ConversationActions";
 
 export default async function ConversationPage({
   params,
@@ -23,11 +24,22 @@ export default async function ConversationPage({
     .maybeSingle();
   if (!conversation) notFound();
 
-  const { data: messages } = await supabase
+  // My own membership row: tells us whether I archived this and, if I
+  // deleted it earlier, the moment before which I no longer see messages.
+  const { data: member } = await supabase
+    .from("conversation_members")
+    .select("archived_at, deleted_at")
+    .eq("conversation_id", conversationId)
+    .eq("profile_id", userId)
+    .maybeSingle();
+
+  let messagesQuery = supabase
     .from("messages")
     .select("id, sender_id, body, created_at")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: true });
+  if (member?.deleted_at) messagesQuery = messagesQuery.gt("created_at", member.deleted_at);
+  const { data: messages } = await messagesQuery;
 
   const participantNames = await getConversationParticipantNames(conversationId);
   await markConversationRead(conversationId);
@@ -44,9 +56,12 @@ export default async function ConversationPage({
           },
         ]}
       />
-      <h1 className="mb-4 font-display text-xl font-semibold text-ink">
-        {participantNames[Object.keys(participantNames).find((id) => id !== userId) ?? ""] ?? "Conversation"}
-      </h1>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h1 className="font-display text-xl font-semibold text-ink">
+          {participantNames[Object.keys(participantNames).find((id) => id !== userId) ?? ""] ?? "Conversation"}
+        </h1>
+        <ConversationActions conversationId={conversationId} archived={Boolean(member?.archived_at)} />
+      </div>
       <MessageThread
         conversationId={conversationId}
         currentUserId={userId}

@@ -10,6 +10,7 @@
 // see the plan doc (notes-delivery-plan.md, section 1) for why they port as-is.
 
 import { revalidatePath } from "next/cache";
+import { cleanTheme, MAX_THEME_LENGTH, normalizeWeekRange, validateWeekRange } from "@/lib/topicWeeks";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertGlobalRole, assertSubjectRole, requireUser } from "@/lib/actions/authGuards";
@@ -827,10 +828,19 @@ async function createTopicImpl(input: {
   academicYear: string;
   term: 1 | 2 | 3;
   weekNumber?: number;
+  /** Last week the topic covers; defaults to weekNumber (a single-week topic). */
+  weekEndNumber?: number;
+  theme?: string;
 }) {
   await assertSubjectRole(input.subjectId, ["teacher", "reviewer"]);
   const trimmed = input.title.trim();
   if (!trimmed) throw new Error("Give the topic a title.");
+
+  const weekProblem = validateWeekRange(input.weekNumber, input.weekEndNumber);
+  if (weekProblem) throw new Error(weekProblem);
+  const theme = cleanTheme(input.theme);
+  if (theme && theme.length > MAX_THEME_LENGTH) throw new Error(`A theme can be at most ${MAX_THEME_LENGTH} characters.`);
+  const weeks = normalizeWeekRange(input.weekNumber, input.weekEndNumber);
 
   const supabase = createClient();
   const { data: latest } = await supabase
@@ -854,7 +864,9 @@ async function createTopicImpl(input: {
       level_number: input.levelNumber,
       academic_year: input.academicYear,
       term: input.term,
-      week_number: input.weekNumber ?? null,
+      week_number: weeks.week_number,
+      week_end_number: weeks.week_end_number,
+      theme,
       sequence_order: (latest?.sequence_order ?? 0) + 1,
     })
     .select("id")

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { CreateParentForm } from "@/components/admin/CreateParentForm";
+import { ParentsCsvImport } from "@/components/admin/ParentsCsvImport";
 import { AccountActions } from "@/components/admin/AccountActions";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
@@ -26,6 +27,7 @@ export default async function AdminParentsPage() {
       <h1 className="font-display text-xl font-semibold text-ink">Parents</h1>
 
       <CreateParentForm students={students ?? []} />
+      <ParentsCsvImport />
 
       <ul className="space-y-2">
         {(parents ?? []).map((p) => (

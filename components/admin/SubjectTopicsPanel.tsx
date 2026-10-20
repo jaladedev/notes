@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { formatWeekRange, MAX_THEME_LENGTH, validateWeekRange } from "@/lib/topicWeeks";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createTopic } from "@/lib/actions/notes";
@@ -14,6 +15,8 @@ type Topic = {
   academic_year: string;
   term: number;
   week_number: number | null;
+  week_end_number: number | null;
+  theme: string | null;
 };
 
 const LEVELS = ["primary", "jss", "sss"] as const;
@@ -26,10 +29,19 @@ export function SubjectTopicsPanel({ subjectId, topics }: { subjectId: string; t
   const [academicYear, setAcademicYear] = useState("");
   const [term, setTerm] = useState("1");
   const [weekNumber, setWeekNumber] = useState("");
+  const [weekEndNumber, setWeekEndNumber] = useState("");
+  const [theme, setTheme] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function add(e: React.FormEvent) {
     e.preventDefault();
+    const start = weekNumber.trim() ? Number(weekNumber) : undefined;
+    const end = weekEndNumber.trim() ? Number(weekEndNumber) : undefined;
+    const weekProblem = validateWeekRange(start, end);
+    if (weekProblem) {
+      emitToast(weekProblem, "error");
+      return;
+    }
     startTransition(async () => {
       const res = await createTopic({
         subjectId,
@@ -38,7 +50,9 @@ export function SubjectTopicsPanel({ subjectId, topics }: { subjectId: string; t
         levelNumber: Number(levelNumber),
         academicYear: academicYear.trim(),
         term: Number(term) as 1 | 2 | 3,
-        weekNumber: weekNumber.trim() ? Number(weekNumber) : undefined,
+        weekNumber: start,
+        weekEndNumber: end,
+        theme,
       });
       if (!res.ok) {
         emitToast(res.error, "error");
@@ -46,6 +60,8 @@ export function SubjectTopicsPanel({ subjectId, topics }: { subjectId: string; t
       }
       setTitle("");
       setWeekNumber("");
+      setWeekEndNumber("");
+      setTheme("");
       router.refresh();
     });
   }
@@ -58,7 +74,8 @@ export function SubjectTopicsPanel({ subjectId, topics }: { subjectId: string; t
           <li key={t.id}>
             <Link href={`/dashboard/teacher/notes/${t.id}`} className="text-sm text-ink hover:underline">
               {t.education_level.toUpperCase()} {t.level_number} · {t.academic_year} · T{t.term}
-              {t.week_number != null ? ` · Wk ${t.week_number}` : ""} — {t.title}
+              {formatWeekRange(t.week_number, t.week_end_number) ? ` · ${formatWeekRange(t.week_number, t.week_end_number)}` : ""}
+              {t.theme ? ` · ${t.theme}` : ""} — {t.title}
             </Link>
           </li>
         ))}
@@ -112,6 +129,24 @@ export function SubjectTopicsPanel({ subjectId, topics }: { subjectId: string; t
           min={1}
           placeholder="Week # (optional)"
           className="rounded-md border border-rule bg-white px-2 py-1.5 text-sm text-ink"
+        />
+        <input
+          value={weekEndNumber}
+          onChange={(e) => setWeekEndNumber(e.target.value)}
+          type="number"
+          min={Number(weekNumber) || 1}
+          disabled={!weekNumber.trim()}
+          placeholder="Ends week # (optional)"
+          title="Last week this topic covers. Leave blank for a single week."
+          className="rounded-md border border-rule bg-white px-2 py-1.5 text-sm text-ink disabled:opacity-50"
+        />
+        <input
+          value={theme}
+          onChange={(e) => setTheme(e.target.value)}
+          maxLength={MAX_THEME_LENGTH}
+          placeholder="Theme (optional)"
+          title="Groups related topics, e.g. Number and Numeration"
+          className="col-span-2 rounded-md border border-rule bg-white px-2 py-1.5 text-sm text-ink"
         />
         <button
           type="submit"

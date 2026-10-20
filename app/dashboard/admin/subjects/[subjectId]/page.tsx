@@ -36,7 +36,7 @@ export default async function AdminSubjectPage({
 
   const { data: topics } = await supabase
     .from("topics")
-    .select("id, title, education_level, level_number, academic_year, term, week_number")
+    .select("id, title, education_level, level_number, academic_year, term, week_number, week_end_number, theme")
     .eq("subject_id", subjectId)
     .order("education_level", { ascending: true })
     .order("level_number", { ascending: true })

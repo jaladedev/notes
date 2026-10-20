@@ -7,6 +7,7 @@
 // propose it as the default PDF filename.
 
 import { cache } from "react";
+import { formatWeekRange } from "@/lib/topicWeeks";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -18,7 +19,7 @@ const getTopic = cache(async (topicId: string) => {
   const supabase = createClient();
   const { data } = await supabase
     .from("topics")
-    .select("id, title, education_level, level_number, academic_year, term, week_number, subjects(name)")
+    .select("id, title, education_level, level_number, academic_year, term, week_number, week_end_number, theme, subjects(name)")
     .eq("id", topicId)
     .single();
   return data as
@@ -30,6 +31,8 @@ const getTopic = cache(async (topicId: string) => {
         academic_year: string;
         term: number;
         week_number: number | null;
+        week_end_number: number | null;
+        theme: string | null;
         subjects: { name: string } | null;
       }
     | null;
@@ -79,7 +82,8 @@ export default async function StudentTopicHandoutPage({
     `${topic.education_level.toUpperCase()} ${topic.level_number}`,
     topic.academic_year,
     `Term ${topic.term}`,
-    topic.week_number != null ? `Week ${topic.week_number}` : null,
+    topic.theme,
+    formatWeekRange(topic.week_number, topic.week_end_number),
   ]
     .filter(Boolean)
     .join(" · ");

@@ -7,6 +7,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/actions/authGuards";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { getOverdueHomeworkForStudent } from "@/lib/actions/homeworkAlerts";
+import { StudentOverdueHomeworkPanel } from "@/components/homework/OverdueHomeworkPanel";
 
 export default async function StudentLevelPage({
   params,
@@ -33,6 +35,7 @@ export default async function StudentLevelPage({
   // not just the ones that already have topics at this level.
   const { data: subjects } = await supabase.from("subjects").select("id, name").order("name");
   const subjectList = subjects ?? [];
+  const overdueHomework = await getOverdueHomeworkForStudent(userId);
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
@@ -45,6 +48,12 @@ export default async function StudentLevelPage({
           Timetable
         </Link>
       </div>
+
+      {overdueHomework.length > 0 && (
+        <div className="mb-4">
+          <StudentOverdueHomeworkPanel items={overdueHomework} />
+        </div>
+      )}
 
       {subjectList.length === 0 ? (
         <p className="text-sm text-ink-soft">No subjects have been created yet.</p>

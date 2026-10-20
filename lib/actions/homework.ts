@@ -6,7 +6,7 @@ import { assertSubjectRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
 import { getSchoolTimeZone } from "@/lib/actions/timetable";
-import { validateDueDate } from "@/lib/dueDate";
+import { validateHomework } from "@/lib/homeworkValidation";
 
 export async function createHomework(
   ...args: Parameters<typeof createHomeworkImpl>
@@ -26,23 +26,69 @@ async function createHomeworkImpl(input: {
 
   const { id: userId } = await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
-  // Checked on the server, not just by the form's min attribute, which a
-  // browser can't enforce for a stale tab or a direct call.
-  if (input.dueAt) {
-    const problem = validateDueDate(input.dueAt, new Date(), await getSchoolTimeZone());
-    if (problem) throw new Error(problem);
-  }
+  // Checked on the server, not just by the form, which a stale tab or a
+  // direct call can bypass.
+  const problem = validateHomework(input, new Date(), await getSchoolTimeZone());
+  if (problem) throw new Error(problem);
 
   const { error } = await supabase.from("homework").insert({
     topic_id: input.topicId,
-    title: input.title,
-    instructions: input.instructions ?? null,
+    title: input.title.trim(),
+    instructions: input.instructions?.trim() || null,
     due_at: input.dueAt ?? null,
     created_by: userId,
   });
   if (error) throwDbError(error);
 
   revalidatePath(`/dashboard/teacher/notes/${input.topicId}`);
+}
+
+export async function updateHomework(
+  ...args: Parameters<typeof updateHomeworkImpl>
+): Promise<ActionResult<void>> {
+  return toResult(() => updateHomeworkImpl(...args));
+}
+
+/**
+ * Edits a homework's title, instructions and due date. Submissions are
+ * untouched. Allowed after students have submitted (a typo fix or an
+ * extension shouldn't be blocked); an unchanged due date is never
+ * re-validated, so homework whose deadline has passed stays editable.
+ */
+async function updateHomeworkImpl(input: {
+  homeworkId: string;
+  topicId: string;
+  title: string;
+  instructions?: string | null;
+  dueAt?: string | null;
+}) {
+  const supabase = createClient();
+  const { data: existing } = await supabase
+    .from("homework")
+    .select("id, topic_id, due_at, topics(subject_id)")
+    .eq("id", input.homeworkId)
+    .eq("topic_id", input.topicId)
+    .maybeSingle();
+  if (!existing) throw new Error("Homework not found.");
+
+  await assertSubjectRole((existing as any).topics.subject_id, ["teacher", "reviewer"]);
+
+  const problem = validateHomework(input, new Date(), await getSchoolTimeZone(), existing.due_at);
+  if (problem) throw new Error(problem);
+
+  // RLS (homework_write_staff) is the backstop for the role check above.
+  const { error } = await supabase
+    .from("homework")
+    .update({
+      title: input.title.trim(),
+      instructions: input.instructions?.trim() || null,
+      due_at: input.dueAt ?? null,
+    })
+    .eq("id", input.homeworkId);
+  if (error) throwDbError(error);
+
+  revalidatePath(`/dashboard/teacher/notes/${input.topicId}/homework`);
+  revalidatePath(`/dashboard/student/topics/${input.topicId}/homework`);
 }
 
 export async function submitHomework(

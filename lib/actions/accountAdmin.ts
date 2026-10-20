@@ -16,6 +16,13 @@ import { assertGlobalRole, requireUser } from "@/lib/actions/authGuards";
 import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
+import {
+  findDuplicateParentRows,
+  parseChildEmails,
+  unresolvedChildren,
+  validateParentRow,
+  type ParentRowInput,
+} from "@/lib/parentImport";
 
 const TEMP_PASSWORD_WORDS = [
   "acorn", "amber", "atlas", "basil", "birch", "cedar", "cobalt", "coral",
@@ -205,7 +212,12 @@ async function createParentAccountImpl(input: {
     const { error: linkError } = await admin.from("guardian_links").insert(
       input.childStudentIds.map((studentId) => ({ parent_id: userId, student_id: studentId }))
     );
-    if (linkError) throwDbError(linkError);
+    if (linkError) {
+      // Don't leave a parent account behind with none of the children
+      // attached (deleting the auth user cascades to the profile and links).
+      await deleteUserAfterFailedSetup(admin, userId);
+      throwDbError(linkError);
+    }
   }
 
   await writeAuditLog({
@@ -302,6 +314,102 @@ async function bulkCreateStudentsImpl(
   }
 
   revalidatePath("/dashboard/admin/students");
+  return results;
+}
+
+/**
+ * Creates one parent account per row and links each to their children, who
+ * are named by login email in the `children` column. Like bulkCreateStudents
+ * it reuses the single-account path (audit log, temp password, email
+ * uniqueness) and never throws for a bad row: failures are collected so one
+ * typo doesn't lose the rest of the file.
+ *
+ * Every child email is resolved BEFORE the account is created, so a row
+ * either creates the parent with all its links or creates nothing -- never
+ * an account with some children missing.
+ */
+export async function bulkCreateParents(
+  ...args: Parameters<typeof bulkCreateParentsImpl>
+): Promise<ActionResult<Awaited<ReturnType<typeof bulkCreateParentsImpl>>>> {
+  return toResult(() => bulkCreateParentsImpl(...args));
+}
+
+async function bulkCreateParentsImpl(rows: ParentRowInput[]): Promise<BulkImportRowResult[]> {
+  await assertGlobalRole(["admin"], "Only an admin can create accounts.");
+  const admin = createAdminClient();
+
+  // One lookup for every child email in the file.
+  const allChildEmails = [...new Set(rows.flatMap((r) => parseChildEmails(r.children)))];
+  const studentIdByEmail = new Map<string, string>();
+  if (allChildEmails.length > 0) {
+    const { data: students } = await admin
+      .from("profiles")
+      .select("id, email")
+      .eq("role", "student")
+      .in("email", allChildEmails);
+    for (const st of students ?? []) {
+      if (st.email) studentIdByEmail.set(String(st.email).toLowerCase(), st.id);
+    }
+  }
+  const knownStudentEmails = new Set(studentIdByEmail.keys());
+  const duplicates = findDuplicateParentRows(rows);
+
+  const results: BulkImportRowResult[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const rowNumber = i + 2; // +1 for header, +1 for 1-indexing
+    const label = r.email || "(missing)";
+
+    const problem = validateParentRow(r);
+    if (problem) {
+      results.push({ row: rowNumber, email: label, ok: false, message: problem });
+      continue;
+    }
+    if (duplicates.has(i)) {
+      results.push({
+        row: rowNumber,
+        email: label,
+        ok: false,
+        message: "This parent email appears earlier in the file -- list all their children on that first row.",
+      });
+      continue;
+    }
+    const childEmails = parseChildEmails(r.children);
+    const missing = unresolvedChildren(childEmails, knownStudentEmails);
+    if (missing.length > 0) {
+      results.push({
+        row: rowNumber,
+        email: label,
+        ok: false,
+        message: `No student account found for: ${missing.join(", ")}. Nothing was created for this row.`,
+      });
+      continue;
+    }
+
+    try {
+      const { temporaryPassword } = await createParentAccountImpl({
+        fullName: r.fullName.trim(),
+        email: r.email,
+        childStudentIds: childEmails.map((e) => studentIdByEmail.get(e)!),
+      });
+      results.push({
+        row: rowNumber,
+        email: label,
+        ok: true,
+        message: childEmails.length ? `Created and linked to ${childEmails.length} child${childEmails.length === 1 ? "" : "ren"}.` : "Created (no children linked).",
+        temporaryPassword,
+      });
+    } catch (err) {
+      results.push({
+        row: rowNumber,
+        email: label,
+        ok: false,
+        message: err instanceof Error ? err.message : "Failed to create.",
+      });
+    }
+  }
+
+  revalidatePath("/dashboard/admin/parents");
   return results;
 }
 
