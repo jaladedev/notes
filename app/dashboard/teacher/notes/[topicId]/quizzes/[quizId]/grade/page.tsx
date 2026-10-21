@@ -4,7 +4,7 @@
 
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getProfileNames } from "@/lib/actions/studentNames";
 import { assertSubjectRole } from "@/lib/actions/authGuards";
 import { EssayGradingForm } from "@/components/quizzes/EssayGradingForm";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -42,11 +42,8 @@ export default async function GradeEssaysPage({
     .not("submitted_at", "is", null)
     .order("submitted_at", { ascending: true });
 
-  const studentIds = Array.from(new Set((attempts ?? []).map((a: any) => a.student_id)));
-  const { data: students } = studentIds.length
-    ? await createAdminClient().from("profiles").select("id, full_name").in("id", studentIds)
-    : { data: [] as { id: string; full_name: string }[] };
-  const nameById = new Map((students ?? []).map((s) => [s.id, s.full_name]));
+  // Ids come from attempts already read through RLS above, so that read is the access check.
+  const nameById = await getProfileNames((attempts ?? []).map((a: any) => a.student_id));
 
   // Ungraded attempts first, then oldest submission first.
   const sorted = [...(attempts ?? [])].sort(
