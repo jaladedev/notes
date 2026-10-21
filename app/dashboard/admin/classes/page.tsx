@@ -5,13 +5,13 @@
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/actions/authGuards";
+import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { ClassCreateForm } from "@/components/admin/ClassCreateForm";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ClassesCsvImport } from "@/components/admin/ClassesCsvImport";
 
 export default async function AdminClassesPage() {
-  await requireUser();
+  await assertGlobalRole(["admin"], "Only an admin can manage classes.");
   const supabase = createClient();
 
   const { data: classes } = await supabase

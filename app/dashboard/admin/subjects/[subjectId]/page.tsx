@@ -2,7 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/actions/authGuards";
+import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { SubjectTeachersPanel } from "@/components/admin/SubjectTeachersPanel";
 import { SubjectTopicsPanel } from "@/components/admin/SubjectTopicsPanel";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -13,7 +13,7 @@ export default async function AdminSubjectPage({
   params: Promise<{ subjectId: string }>;
 }) {
   const { subjectId } = await params;
-  await requireUser();
+  await assertGlobalRole(["admin"], "Only an admin can manage subjects.");
   const supabase = createClient();
 
   const { data: subject } = await supabase.from("subjects").select("id, name").eq("id", subjectId).single();

@@ -4,12 +4,12 @@
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/actions/authGuards";
+import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { SubjectCreateForm } from "@/components/admin/SubjectCreateForm";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 export default async function AdminSubjectsPage() {
-  await requireUser();
+  await assertGlobalRole(["admin"], "Only an admin can manage subjects.");
   const supabase = createClient();
 
   const { data: subjects } = await supabase.from("subjects").select("id, name").order("name");

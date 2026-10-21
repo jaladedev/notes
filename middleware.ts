@@ -69,16 +69,18 @@ export async function middleware(request: NextRequest) {
 
   let mustChangePassword = false;
   let isActive = true;
+  let isAdmin = false;
 
   if (user && (isDashboardRoute || isLoginRoute || isChangePasswordRoute)) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("must_change_password, is_active")
+      .select("must_change_password, is_active, role")
       .eq("id", user.id)
       .maybeSingle();
 
     isActive = profile?.is_active ?? true;
     mustChangePassword = profile?.must_change_password ?? false;
+    isAdmin = profile?.role === "admin";
 
     // A deactivated account is signed out immediately, everywhere -- see
     // setAccountActive in accountAdmin.ts, which also force-ends the
@@ -94,6 +96,16 @@ export async function middleware(request: NextRequest) {
 
   if (isDashboardRoute && mustChangePassword) {
     return NextResponse.redirect(new URL("/change-password", request.url));
+  }
+
+  // The admin UI is for admins only. Non-admins are sent back to their own
+  // dashboard before any admin page renders. The admin layout and each
+  // page/action re-check this server-side; this is the first gate.
+  const isAdminRoute =
+    request.nextUrl.pathname === "/dashboard/admin" ||
+    request.nextUrl.pathname.startsWith("/dashboard/admin/");
+  if (isAdminRoute && user && !isAdmin) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   if (isChangePasswordRoute && !mustChangePassword && user) {

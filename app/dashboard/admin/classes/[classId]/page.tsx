@@ -6,7 +6,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { requireUser } from "@/lib/actions/authGuards";
+import { assertGlobalRole } from "@/lib/actions/authGuards";
 import { ClassRosterPanel } from "@/components/admin/ClassRosterPanel";
 import { ClassEditPanel } from "@/components/admin/ClassEditPanel";
 import { ClassTeachersPanel } from "@/components/admin/ClassTeachersPanel";
@@ -19,7 +19,7 @@ export default async function AdminClassPage({
   params: Promise<{ classId: string }>;
 }) {
   const { classId } = await params;
-  await requireUser();
+  await assertGlobalRole(["admin"], "Only an admin can manage classes.");
   const supabase = createClient();
 
   const { data: klass } = await supabase
