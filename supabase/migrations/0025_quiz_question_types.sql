@@ -143,3 +143,20 @@ begin
   return query select v_score, v_total, v_pending;
 end;
 $$;
+
+-- Backfill: attempts submitted before this migration were scored by the old
+-- function, which stored only the attempt total. Give their answers a
+-- per-question points_awarded (all were single-choice) so the review page
+-- shows real marks instead of 0 for everything. Idempotent, and a no-op on
+-- a database with no earlier attempts.
+update quiz_answers qa
+set points_awarded = case
+      when exists (
+        select 1 from quiz_options qo
+        where qo.id = qa.option_id and qo.question_id = qa.question_id and qo.is_correct
+      ) then qq.points else 0 end
+from quiz_questions qq, quiz_attempts a
+where qq.id = qa.question_id
+  and a.id = qa.attempt_id
+  and a.submitted_at is not null
+  and qa.points_awarded is null;
