@@ -115,6 +115,32 @@ school-wide. See `lib/actions/announcements.ts`.
 - Timetable extras: copy-a-day/duplicate-a-class tools, term-scoped
   timetables, substitutions and one-off changes, and room clash checking.
 
+## Per-session subscription gating
+
+Access is paid for per academic session, per school (one deployment = one
+school, so no `org_id`). `session_subscriptions` (0036) holds one row per
+paid session: an academic year label plus `starts_on`/`ends_on` dates.
+
+- **Off until the first row exists.** An empty table means gating is not
+  enforced, so existing deployments and local dev are unaffected until a
+  subscription is recorded.
+- **Enforcement:** with any row present, `middleware.ts` sends every signed-in
+  user (admins included) to `/subscription-expired` unless today -- in the
+  school's time zone -- falls inside some session's dates. The last day still
+  counts. Nothing is deleted; access returns the moment a session is active.
+- **Vendor sets it, not the school.** The table has no write policy, so the
+  school's own admin cannot extend it. Record a session with
+  `./scripts/set-subscription.sh add 2026/2027 2026-09-01 2027-07-31 "note"`
+  (also `list` and `remove <id>`), or insert in the Supabase SQL editor.
+  Removing the *last* row turns gating off again.
+- **Renewal warning:** admins see a banner on every dashboard page when 14 or
+  fewer days remain.
+- **Limits:** it is an app-level gate. Someone who calls Supabase directly with
+  a valid session isn't blocked, and public share links (`/shared/[token]`)
+  keep working. Each dashboard request makes one extra `subscription_status()`
+  call. A failed lookup lets the request through rather than locking the
+  school out.
+
 ## Setup (new school)
 
 1. Create a Supabase project for the school (dashboard — no provisioning

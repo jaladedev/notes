@@ -3,6 +3,7 @@ import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { edgeEnv } from "@/lib/env.edge";
 import { logger } from "@/lib/logger";
+import { isLockedOut, parseSubscriptionStatus } from "@/lib/subscription";
 
 // Adapted from school_app's proxy.ts (SHA 466c538). Re-adds
 // handlePasswordChange (must_change_password gate) and a deactivation
@@ -54,8 +55,9 @@ export async function middleware(request: NextRequest) {
   const isDashboardRoute = request.nextUrl.pathname.startsWith("/dashboard");
   const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
   const isChangePasswordRoute = request.nextUrl.pathname.startsWith("/change-password");
+  const isExpiredRoute = request.nextUrl.pathname.startsWith("/subscription-expired");
 
-  if ((isDashboardRoute || isChangePasswordRoute) && !user && !authCheckFailedTransiently) {
+  if ((isDashboardRoute || isChangePasswordRoute || isExpiredRoute) && !user && !authCheckFailedTransiently) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
@@ -98,6 +100,31 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/change-password", request.url));
   }
 
+  // Per-session subscription gate (0036). Everyone, admins included, is
+  // sent to /subscription-expired while the school has no active session;
+  // the table being empty means gating is off. A failed lookup lets the
+  // request through (same stance as a transient auth failure above): a
+  // database blip must not lock a whole school out. Note this is an app-level
+  // gate -- it does not stop someone calling Supabase directly with a valid
+  // session.
+  if (user && (isDashboardRoute || isExpiredRoute)) {
+    const { data: rawStatus, error: statusError } = await supabase.rpc("subscription_status");
+    const status = statusError ? null : parseSubscriptionStatus(rawStatus);
+    if (statusError) {
+      logger.warn("middleware: subscription status lookup failed, allowing the request", {
+        path: request.nextUrl.pathname,
+        error: statusError,
+      });
+    }
+    const locked = isLockedOut(status);
+    if (isDashboardRoute && locked) {
+      return NextResponse.redirect(new URL("/subscription-expired", request.url));
+    }
+    if (isExpiredRoute && !locked) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  }
+
   // The admin UI is for admins only. Non-admins are sent back to their own
   // dashboard before any admin page renders. The admin layout and each
   // page/action re-check this server-side; this is the first gate.
@@ -122,5 +149,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/change-password"],
+  matcher: ["/dashboard/:path*", "/login", "/change-password", "/subscription-expired"],
 };

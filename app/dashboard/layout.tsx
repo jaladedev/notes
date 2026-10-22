@@ -2,6 +2,7 @@ import { createClient, getCurrentProfile } from "@/lib/supabase/server";
 import { getNavBadgeCounts } from "@/lib/actions/notifications";
 import { signOut } from "@/lib/actions/session";
 import { DashboardNav, type NavItem } from "@/components/DashboardNav";
+import { parseSubscriptionStatus, renewalWarning, shouldWarnAdmin } from "@/lib/subscription";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
@@ -15,6 +16,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ]);
 
   const isAdmin = profile.role === "admin";
+
+  // Renewal heads-up for admins only (0036). A failed lookup just means no banner.
+  const subscription = isAdmin
+    ? parseSubscriptionStatus((await supabase.rpc("subscription_status")).data)
+    : null;
+
   const home: NavItem =
     profile.role === "parent"
       ? { label: "My children", href: "/dashboard/parent" }
@@ -55,6 +62,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
         adminItems={adminItems}
         signOutAction={signOut}
       />
+      {subscription && shouldWarnAdmin(subscription) && (
+        <div role="status" className="border-b border-rule bg-marigold/20 px-4 py-2 text-center text-sm text-ink print:hidden">
+          {renewalWarning(subscription)}
+        </div>
+      )}
       <main id="main">{children}</main>
     </>
   );

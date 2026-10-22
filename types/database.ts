@@ -120,6 +120,16 @@ export type Database = {
         Args: Record<string, never>;
         Returns: { id: string; full_name: string }[];
       };
+      subscription_status: {
+        Args: Record<string, never>;
+        Returns: {
+          state: "off" | "active" | "upcoming" | "expired";
+          academic_year: string | null;
+          starts_on: string | null;
+          ends_on: string | null;
+          days_left: number | null;
+        }[];
+      };
       search_topic_notes_prefix: {
         Args: { p_query: string; p_limit?: number };
         Returns: { id: string; rank: number }[];
