@@ -7,7 +7,7 @@ describe("validateSubscriptionInput", () => {
   it("accepts and trims a good input", () => {
     expect(validateSubscriptionInput(good)).toEqual({
       ok: true,
-      value: { academicYear: "2026/2027", startsOn: "2026-09-01", endsOn: "2027-07-31", note: "Paid" },
+      value: { academicYear: "2026/2027", startsOn: "2026-09-01", endsOn: "2027-07-31", note: "Paid", graceDays: null },
     });
   });
   it("treats a missing or blank note as null", () => {
@@ -33,3 +33,21 @@ describe("validateSubscriptionInput", () => {
     expect(validateSubscriptionInput({ ...good, note: "x".repeat(501) }).ok).toBe(false);
   });
 });
+
+describe("graceDays", () => {
+  it("is optional (null lets the database default apply)", () => {
+    expect(validateSubscriptionInput({ ...good, graceDays: undefined })).toMatchObject({ ok: true, value: { graceDays: null } });
+    expect(validateSubscriptionInput({ ...good, graceDays: null })).toMatchObject({ ok: true, value: { graceDays: null } });
+  });
+  it("accepts whole numbers from 0 to 60", () => {
+    expect(validateSubscriptionInput({ ...good, graceDays: 0 })).toMatchObject({ ok: true, value: { graceDays: 0 } });
+    expect(validateSubscriptionInput({ ...good, graceDays: 14 })).toMatchObject({ ok: true, value: { graceDays: 14 } });
+    expect(validateSubscriptionInput({ ...good, graceDays: 60 })).toMatchObject({ ok: true, value: { graceDays: 60 } });
+  });
+  it("rejects out-of-range, fractional and non-numeric values", () => {
+    for (const bad of [-1, 61, 1.5, "7", NaN, Infinity]) {
+      expect(validateSubscriptionInput({ ...good, graceDays: bad }).ok).toBe(false);
+    }
+  });
+});
+

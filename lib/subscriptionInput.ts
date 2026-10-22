@@ -7,7 +7,11 @@ export type SubscriptionInput = {
   startsOn: string;
   endsOn: string;
   note: string | null;
+  /** null = let the database default (7) apply. */
+  graceDays: number | null;
 };
+
+export const MAX_GRACE_DAYS = 60;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -40,5 +44,13 @@ export function validateSubscriptionInput(
     if (typeof r.note !== "string" || r.note.length > 500) return { ok: false, error: "note must be text up to 500 characters." };
     note = r.note.trim() || null;
   }
-  return { ok: true, value: { academicYear, startsOn: r.startsOn, endsOn: r.endsOn, note } };
+
+  let graceDays: number | null = null;
+  if (r.graceDays !== undefined && r.graceDays !== null) {
+    if (typeof r.graceDays !== "number" || !Number.isInteger(r.graceDays) || r.graceDays < 0 || r.graceDays > MAX_GRACE_DAYS) {
+      return { ok: false, error: `graceDays must be a whole number from 0 to ${MAX_GRACE_DAYS}.` };
+    }
+    graceDays = r.graceDays;
+  }
+  return { ok: true, value: { academicYear, startsOn: r.startsOn, endsOn: r.endsOn, note, graceDays } };
 }

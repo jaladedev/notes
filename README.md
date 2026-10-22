@@ -126,15 +126,24 @@ paid session: an academic year label plus `starts_on`/`ends_on` dates.
   subscription is recorded.
 - **Enforcement:** with any row present, `middleware.ts` sends every signed-in
   user (admins included) to `/subscription-expired` unless today -- in the
-  school's time zone -- falls inside some session's dates. The last day still
-  counts. Nothing is deleted; access returns the moment a session is active.
+  school's time zone -- falls inside some session's dates or its grace period
+  (below). The last day still counts. Nothing is deleted; access returns the
+  moment a session is active.
+- **Grace period (0039):** each row has `grace_days` (0-60, default 7). For that
+  many days after `ends_on` the school keeps full access and its admins see a
+  renewal warning with the cut-off date; only after that does the lockout
+  start. Grace beats a later session that hasn't started yet, so a school isn't
+  locked in the gap between sessions while it is still inside grace. Set it per
+  session: `./scripts/set-subscription.sh add 2026/2027 2026-09-01 2027-07-31
+  "note" 14` (`0` = no grace). Existing rows pick up the 7-day default when
+  0039 is applied.
 - **Vendor sets it, not the school.** The table has no write policy, so the
   school's own admin cannot extend it. Record a session with
   `./scripts/set-subscription.sh add 2026/2027 2026-09-01 2027-07-31 "note"`
   (also `list` and `remove <id>`), or insert in the Supabase SQL editor.
   Removing the *last* row turns gating off again.
 - **Renewal warning:** admins see a banner on every dashboard page when 14 or
-  fewer days remain.
+  fewer days remain, and throughout the grace period.
 - **Limits:** it is an app-level gate. Someone who calls Supabase directly with
   a valid session isn't blocked, and public share links (`/shared/[token]`)
   keep working. Each dashboard request makes one extra `subscription_status()`
@@ -163,9 +172,11 @@ calls; nothing here knows about other schools.
   that window; there is no nonce store.
 - The dashboard never holds a school's database keys. Compromising it exposes
   only what these endpoints allow, plus each school's `PLATFORM_SECRET`.
-- Needs migrations `0036` and `0037` (0037 makes the service role's access to
-  `subscription_status()` explicit; a school that already applied 0036 just
-  needs 0037 as well).
+- Needs migrations `0036`, `0037` and `0039` (0037 makes the service role's
+  access to `subscription_status()` explicit; 0039 adds the grace period and
+  re-creates `subscription_status()` with a `grace_ends_on` column, keeping the
+  grants). `POST /api/platform/subscriptions` accepts an optional `graceDays`
+  (0-60); omitted, the 7-day default applies.
 - To rotate: change `PLATFORM_SECRET` on the school and the matching `secret`
   in the dashboard's `SCHOOLS_JSON`.
 

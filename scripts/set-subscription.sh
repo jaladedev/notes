@@ -10,12 +10,15 @@
 #
 # Usage (run from the repo root, against an already-linked project --
 # provision-school.sh links it):
-#   ./scripts/set-subscription.sh add  <academic-year> <starts-on> <ends-on> [note]
+#   ./scripts/set-subscription.sh add  <academic-year> <starts-on> <ends-on> [note] [grace-days]
 #   ./scripts/set-subscription.sh list
 #   ./scripts/set-subscription.sh remove <id>
 #
+# grace-days (0-60, default 7): days after ends-on the school keeps access, with a
+# renewal warning for its admins, before the lockout (migration 0039). 0 = none.
+#
 # Example:
-#   ./scripts/set-subscription.sh add 2026/2027 2026-09-01 2027-07-31 "Paid, ref 4471"
+#   ./scripts/set-subscription.sh add 2026/2027 2026-09-01 2027-07-31 "Paid, ref 4471" 14
 #
 # To extend a subscription, `add` a new row covering the new dates (or
 # `remove` the old one and add it again). Overlapping rows are harmless.
@@ -31,21 +34,27 @@ sql_quote() { printf "'%s'" "${1//\'/\'\'}"; }
 
 case "$cmd" in
   add)
-    year="${2:?Usage: $0 add <academic-year> <starts-on YYYY-MM-DD> <ends-on YYYY-MM-DD> [note]}"
+    year="${2:?Usage: $0 add <academic-year> <starts-on YYYY-MM-DD> <ends-on YYYY-MM-DD> [note] [grace-days]}"
     starts="${3:?Usage: $0 add <academic-year> <starts-on YYYY-MM-DD> <ends-on YYYY-MM-DD> [note]}"
     ends="${4:?Usage: $0 add <academic-year> <starts-on YYYY-MM-DD> <ends-on YYYY-MM-DD> [note]}"
     note="${5:-}"
+    grace="${6:-}"
+    if [ -n "$grace" ]; then
+      [[ "$grace" =~ ^[0-9]+$ ]] && [ "$grace" -le 60 ] || { echo "grace-days must be a whole number from 0 to 60." >&2; exit 1; }
+    fi
     [[ "$starts" =~ $date_re && "$ends" =~ $date_re ]] || { echo "Dates must be YYYY-MM-DD." >&2; exit 1; }
     [[ "$ends" < "$starts" ]] && { echo "ends-on is before starts-on." >&2; exit 1; }
     note_sql="null"
     [ -n "$note" ] && note_sql="$(sql_quote "$note")"
+    grace_col=""; grace_val=""
+    if [ -n "$grace" ]; then grace_col=", grace_days"; grace_val=", $grace"; fi
     npx supabase db execute --sql \
-      "insert into public.session_subscriptions (academic_year, starts_on, ends_on, note) values ($(sql_quote "$year"), '$starts', '$ends', $note_sql);"
-    echo "Recorded ${year}: ${starts} to ${ends}. Gating is now enforced for this school."
+      "insert into public.session_subscriptions (academic_year, starts_on, ends_on, note${grace_col}) values ($(sql_quote "$year"), '$starts', '$ends', $note_sql${grace_val});"
+    echo "Recorded ${year}: ${starts} to ${ends}${grace:+ (grace ${grace} days)}. Gating is now enforced for this school."
     ;;
   list)
     npx supabase db execute --sql \
-      "select id, academic_year, starts_on, ends_on, note from public.session_subscriptions order by ends_on desc;"
+      "select id, academic_year, starts_on, ends_on, grace_days, note from public.session_subscriptions order by ends_on desc;"
     ;;
   remove)
     id="${2:?Usage: $0 remove <id>}"

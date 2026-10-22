@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await createAdminClient()
     .from("session_subscriptions")
-    .select("id, academic_year, starts_on, ends_on, note, created_at")
+    .select("id, academic_year, starts_on, ends_on, grace_days, note, created_at")
     .order("ends_on", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ subscriptions: data ?? [] });
@@ -42,8 +42,10 @@ export async function POST(request: NextRequest) {
       starts_on: parsed.value.startsOn,
       ends_on: parsed.value.endsOn,
       note: parsed.value.note,
+      // Omitted when not given, so the column default (7 days) applies.
+      ...(parsed.value.graceDays === null ? {} : { grace_days: parsed.value.graceDays }),
     })
-    .select("id, academic_year, starts_on, ends_on, note, created_at")
+    .select("id, academic_year, starts_on, ends_on, grace_days, note, created_at")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ subscription: data }, { status: 201 });

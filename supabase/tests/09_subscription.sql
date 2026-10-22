@@ -135,5 +135,96 @@ begin
   raise notice 'ok 5: ends_on before starts_on is rejected';
 end $$;
 
+-- 6. grace period (0039). Fixed dates via subscription_status_at().
+do $$
+declare s record;
+begin
+  delete from session_subscriptions;
+  insert into session_subscriptions (academic_year, starts_on, ends_on, grace_days)
+    values ('2025/2026', '2025-09-01', '2026-07-31', 7);
+
+  select * into s from subscription_status_at('2026-07-31');
+  if s.state <> 'active' or s.days_left <> 0 or s.grace_ends_on <> '2026-08-07' then
+    raise exception 'FAIL 6a: last paid day should be active with grace_ends_on 2026-08-07, got % / % / %', s.state, s.days_left, s.grace_ends_on;
+  end if;
+
+  select * into s from subscription_status_at('2026-08-01');
+  if s.state <> 'grace' or s.days_left <> 6 or s.ends_on <> '2026-07-31' or s.grace_ends_on <> '2026-08-07' then
+    raise exception 'FAIL 6b: first grace day wrong: % / % / %', s.state, s.days_left, s.grace_ends_on;
+  end if;
+
+  select * into s from subscription_status_at('2026-08-07');
+  if s.state <> 'grace' or s.days_left <> 0 then
+    raise exception 'FAIL 6c: last grace day should still be grace (days_left 0), got % / %', s.state, s.days_left;
+  end if;
+
+  select * into s from subscription_status_at('2026-08-08');
+  if s.state <> 'expired' or s.academic_year <> '2025/2026' then
+    raise exception 'FAIL 6d: the day after grace should be expired, got %', s.state;
+  end if;
+  raise notice 'ok 6a-d: active -> grace (days_left counts down) -> expired';
+
+  -- grace wins over upcoming while it lasts; upcoming resumes after
+  insert into session_subscriptions (academic_year, starts_on, ends_on, grace_days)
+    values ('2026/2027', '2026-09-01', '2027-07-31', 7);
+  select * into s from subscription_status_at('2026-08-03');
+  if s.state <> 'grace' then
+    raise exception 'FAIL 6e: grace should win over a later upcoming session, got %', s.state;
+  end if;
+  select * into s from subscription_status_at('2026-08-20');
+  if s.state <> 'upcoming' or s.academic_year <> '2026/2027' then
+    raise exception 'FAIL 6f: after grace, with a later session recorded, expected upcoming, got % / %', s.state, s.academic_year;
+  end if;
+  select * into s from subscription_status_at('2026-09-01');
+  if s.state <> 'active' or s.academic_year <> '2026/2027' then
+    raise exception 'FAIL 6g: new session should be active on its start date, got %', s.state;
+  end if;
+  raise notice 'ok 6e-g: grace beats upcoming; upcoming after; renewal makes it active';
+
+  -- grace_days = 0 keeps the strict behaviour
+  update session_subscriptions set grace_days = 0 where academic_year = '2025/2026';
+  select * into s from subscription_status_at('2026-08-01');
+  if s.state <> 'upcoming' then
+    raise exception 'FAIL 6h: grace_days 0 should give no grace, got %', s.state;
+  end if;
+  raise notice 'ok 6h: grace_days = 0 means no grace';
+end $$;
+
+do $$
+declare v_failed boolean;
+begin
+  v_failed := false;
+  begin
+    insert into session_subscriptions (academic_year, starts_on, ends_on, grace_days)
+      values ('bad', current_date, current_date + 1, 61);
+  exception when check_violation then v_failed := true;
+  end;
+  if not v_failed then raise exception 'FAIL 6i: grace_days 61 was accepted'; end if;
+
+  v_failed := false;
+  begin
+    insert into session_subscriptions (academic_year, starts_on, ends_on, grace_days)
+      values ('bad', current_date, current_date + 1, -1);
+  exception when check_violation then v_failed := true;
+  end;
+  if not v_failed then raise exception 'FAIL 6j: negative grace_days was accepted'; end if;
+  raise notice 'ok 6i-j: grace_days must be between 0 and 60';
+end $$;
+
+-- the date-injectable helper is internal: signed-in users cannot call it
+do $$
+declare v_failed boolean := false;
+begin
+  perform set_config('request.jwt.claim.sub', 'a9000000-0000-0000-0000-000000000002', true);
+  set local role authenticated;
+  begin
+    perform * from subscription_status_at('2026-01-01');
+  exception when insufficient_privilege then v_failed := true;
+  end;
+  reset role;
+  if not v_failed then raise exception 'FAIL 6k: a signed-in user could call subscription_status_at'; end if;
+  raise notice 'ok 6k: subscription_status_at is not callable by signed-in users';
+end $$;
+
 delete from session_subscriptions;
 do $$ begin raise notice 'SUBSCRIPTION: ALL ASSERTIONS PASSED'; end $$;
