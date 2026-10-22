@@ -71,7 +71,7 @@ export default async function TeacherNotePage({
 
   const { data: shareLinks } = await supabase
     .from("share_links")
-    .select("id, token, access_code, expires_at")
+    .select("id, token, has_access_code, expires_at")
     .eq("topic_id", topicId)
     .order("created_at", { ascending: false });
 

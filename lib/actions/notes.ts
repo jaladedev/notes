@@ -10,6 +10,8 @@
 // see the plan doc (notes-delivery-plan.md, section 1) for why they port as-is.
 
 import { revalidatePath } from "next/cache";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { cleanTheme, MAX_THEME_LENGTH, normalizeWeekRange, validateWeekRange } from "@/lib/topicWeeks";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -18,6 +20,16 @@ import { throwDbError } from "@/lib/errors/db";
 import { toResult, type ActionResult } from "@/lib/actions/result";
 import { writeAuditLog } from "@/lib/audit";
 import { TOPIC_RESOURCE_BUCKET } from "@/lib/storageBuckets";
+import {
+  PROOF_COOKIE,
+  PROOF_MAX_AGE_SECONDS,
+  createAttemptLimiter,
+  hashAccessCode,
+  makeUnlockProof,
+  safeEqual,
+  verifyAccessCode,
+  verifyUnlockProof,
+} from "@/lib/shareCode";
 
 /**
  * Save a note. A "published" save goes through the space's review gate
@@ -955,16 +967,20 @@ async function createShareLinkImpl(
   await assertSubjectRole(topic.subject_id, ["teacher", "reviewer"]);
 
   const token = generateShareToken();
+  const code = options.accessCode?.trim();
+  if (code && code.length < 4) throw new Error("An access code must be at least 4 characters.");
+  if (code && code.length > 100) throw new Error("That access code is too long.");
   const { data: link, error } = await supabase
     .from("share_links")
     .insert({
       topic_id: topicId,
       token,
-      access_code: options.accessCode?.trim() || null,
+      // Only a salted hash is stored -- never the code itself.
+      access_code_hash: code ? await hashAccessCode(code) : null,
       created_by: teacherId,
       expires_at: options.expiresAt || null,
     })
-    .select("*")
+    .select("id, topic_id, token, has_access_code, created_at, expires_at")
     .single();
   if (error) throwDbError(error);
 
@@ -993,6 +1009,69 @@ async function revokeShareLinkImpl(linkId: string) {
   revalidatePath(`/dashboard/teacher/notes/${link.topic_id}`);
 }
 
+const unlockLimiter = createAttemptLimiter(10, 15 * 60 * 1000);
+
+/**
+ * Form action for the public access-code prompt. The code arrives in a POST
+ * body (never the URL); on success a short-lived httpOnly cookie, scoped to
+ * this link's path, proves it. Always ends in a redirect back to the page.
+ */
+export async function unlockShareLink(token: string, formData: FormData): Promise<void> {
+  const raw = formData.get("code");
+  const code = typeof raw === "string" ? raw.trim() : "";
+  const back = `/shared/${encodeURIComponent(token)}`;
+
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+  const key = `${token}|${ip}`;
+  if (unlockLimiter.isBlocked(key)) redirect(`${back}?e=wait`);
+
+  const admin = createAdminClient();
+  const { data: link } = await admin
+    .from("share_links")
+    .select("id, access_code, access_code_hash")
+    .eq("token", token)
+    .maybeSingle();
+
+  let storedHash: string | null = link?.access_code_hash ?? null;
+  let ok = false;
+
+  if (link && code && code.length <= 100) {
+    if (storedHash) {
+      ok = await verifyAccessCode(code, storedHash);
+    } else if (link.access_code) {
+      ok = safeEqual(code, link.access_code);
+      if (ok) {
+        // Upgrade a legacy plain-text code: store the hash, drop the plain text.
+        storedHash = await hashAccessCode(code);
+        const { error } = await admin
+          .from("share_links")
+          .update({ access_code_hash: storedHash, access_code: null })
+          .eq("id", link.id);
+        if (error) {
+          storedHash = null;
+          ok = false;
+        }
+      }
+    }
+  }
+
+  if (!ok || !storedHash) {
+    unlockLimiter.recordFailure(key);
+    redirect(`${back}?e=1`);
+  }
+
+  unlockLimiter.reset(key);
+  (await cookies()).set(PROOF_COOKIE, makeUnlockProof(storedHash, token), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: `/shared/${token}`,
+    maxAge: PROOF_MAX_AGE_SECONDS,
+  });
+  redirect(back);
+}
+
 /**
  * Looks up a share link and returns its topic's content -- unauthenticated,
  * for the public /shared/[token] page. Uses the admin client since the
@@ -1000,12 +1079,12 @@ async function revokeShareLinkImpl(linkId: string) {
  * would apply to a logged-in student (published + approved + released),
  * plus the link's own expiry and optional access code.
  */
-export async function resolveShareLink(token: string, accessCode?: string) {
+export async function resolveShareLink(token: string, unlockProof?: string) {
   const admin = createAdminClient();
 
   const { data: link } = await admin
     .from("share_links")
-    .select("id, topic_id, access_code, expires_at")
+    .select("id, topic_id, access_code, access_code_hash, expires_at")
     .eq("token", token)
     .maybeSingle();
   if (!link) return { error: "not_found" as const };
@@ -1013,7 +1092,14 @@ export async function resolveShareLink(token: string, accessCode?: string) {
   if (link.expires_at && new Date(link.expires_at) < new Date()) {
     return { error: "expired" as const };
   }
-  if (link.access_code && link.access_code !== accessCode) {
+  // A hashed code is satisfied only by the proof cookie unlockShareLink sets
+  // after a correct entry. A legacy plain-text code (not yet upgraded) always
+  // asks for the code, so unlockShareLink can upgrade it -- fail closed.
+  if (link.access_code_hash) {
+    if (!verifyUnlockProof(link.access_code_hash, token, unlockProof)) {
+      return { error: "needs_code" as const };
+    }
+  } else if (link.access_code) {
     return { error: "needs_code" as const };
   }
 

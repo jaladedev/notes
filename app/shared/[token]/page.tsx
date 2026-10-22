@@ -3,7 +3,9 @@
 // from middleware.ts's auth redirect (matcher only covers /dashboard
 // and /login).
 
+import { cookies } from "next/headers";
 import { resolveShareLink } from "@/lib/actions/notes";
+import { PROOF_COOKIE } from "@/lib/shareCode";
 import { TopicContent } from "@/components/TopicContent";
 import { AccessCodeForm } from "@/components/AccessCodeForm";
 
@@ -12,16 +14,19 @@ export default async function SharedTopicPage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ code?: string }>;
+  searchParams: Promise<{ e?: string }>;
 }) {
   const { token } = await params;
-  const { code } = await searchParams;
+  const { e } = await searchParams;
 
-  const result = await resolveShareLink(token, code);
+  // The access code is never read from the URL: it is POSTed to
+  // unlockShareLink, which sets this httpOnly proof cookie.
+  const proof = (await cookies()).get(PROOF_COOKIE)?.value;
+  const result = await resolveShareLink(token, proof);
 
   if ("error" in result) {
     if (result.error === "needs_code") {
-      return <AccessCodeForm />;
+      return <AccessCodeForm token={token} error={e === "1" ? "wrong" : e === "wait" ? "wait" : undefined} />;
     }
     const message =
       result.error === "expired"

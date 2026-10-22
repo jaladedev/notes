@@ -12,7 +12,7 @@ import { emitToast } from "@/lib/toast";
 type ShareLink = {
   id: string;
   token: string;
-  access_code: string | null;
+  has_access_code: boolean | null;
   expires_at: string | null;
 };
 
@@ -67,7 +67,7 @@ export function ShareLinkManager({ topicId, links }: { topicId: string; links: S
           >
             <span className="min-w-0 truncate">
               /shared/{link.token}
-              {link.access_code && (
+              {link.has_access_code && (
                 <span className="ml-2 text-xs text-ink-soft">(code protected)</span>
               )}
             </span>
@@ -99,7 +99,9 @@ export function ShareLinkManager({ topicId, links }: { topicId: string; links: S
           type="text"
           value={accessCode}
           onChange={(e) => setAccessCode(e.target.value)}
-          placeholder="Optional access code"
+          placeholder="Optional access code (4+ characters)"
+          minLength={4}
+          maxLength={100}
           title="Optional code viewers must enter to open this link"
           className="rounded-lg border border-rule bg-white px-3 py-1.5 text-sm"
         />
