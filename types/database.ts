@@ -65,6 +65,7 @@ export type Database = {
       | "quiz_options"
       | "quiz_attempts"
       | "quiz_answers"
+      | "session_subscriptions"
       | "_schema_migrations",
       AnyTable
     >;

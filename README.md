@@ -141,6 +141,34 @@ paid session: an academic year label plus `starts_on`/`ends_on` dates.
   call. A failed lookup lets the request through rather than locking the
   school out.
 
+## Central platform API (multi-school dashboard)
+
+A separate dashboard app (`notes-platform`, shipped alongside this repo, not
+part of this build) can monitor every school deployment and record each one's
+subscription from one place. This app only exposes the signed endpoints it
+calls; nothing here knows about other schools.
+
+- `GET /api/platform/status` -- school name, term, latest migration,
+  subscription state and active-user counts.
+- `GET | POST | DELETE /api/platform/subscriptions` -- list, add and remove
+  `session_subscriptions` rows (validated; same rules as the table).
+- **Off by default.** Set `PLATFORM_SECRET` (32+ random characters, a different
+  value per school) to switch it on. While it is unset or short, every
+  `/api/platform/*` path answers 404, so a school that never opts in doesn't
+  advertise it.
+- **Auth is a request signature, not a login.** Each call carries
+  `x-platform-timestamp` and `x-platform-signature` = HMAC-SHA256 over
+  `timestamp.METHOD.path?query.body` (`lib/platformAuth.ts`). Requests more
+  than 5 minutes off are refused. A captured request can be replayed inside
+  that window; there is no nonce store.
+- The dashboard never holds a school's database keys. Compromising it exposes
+  only what these endpoints allow, plus each school's `PLATFORM_SECRET`.
+- Needs migrations `0036` and `0037` (0037 makes the service role's access to
+  `subscription_status()` explicit; a school that already applied 0036 just
+  needs 0037 as well).
+- To rotate: change `PLATFORM_SECRET` on the school and the matching `secret`
+  in the dashboard's `SCHOOLS_JSON`.
+
 ## Setup (new school)
 
 1. Create a Supabase project for the school (dashboard — no provisioning

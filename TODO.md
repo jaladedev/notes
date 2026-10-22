@@ -5,8 +5,14 @@
 - [x] Remove unused `components/quizzes/CreateQuizForm.tsx` (superseded by `QuizBuilderForm`, failed type-check against `QuizQuestionInput`).
 - [x] Per-session subscription gating: migration `0036_session_subscriptions.sql` (table + `subscription_status()`), middleware gate and `/subscription-expired` page, admin renewal banner, `scripts/set-subscription.sh`, `lib/subscription.ts` + tests, `supabase/tests/09_subscription.sql`, README section.
 
+- [x] Central platform API: signed `/api/platform/status` and `/api/platform/subscriptions` (`lib/platformAuth.ts`, `lib/platformRoute.ts`, `lib/subscriptionInput.ts`), off until `PLATFORM_SECRET` is set; tests in `tests/platform-*.test.ts` and `tests/subscription-input.test.ts`.
+- [x] `notes-platform` dashboard app (separate project): operator login (scrypt password + optional TOTP), all-schools overview, per-school session add/remove.
+
+- [x] `0037_subscription_status_service_role.sql`: explicit service-role grant, kept out of 0036 because 0036 was already applied (applied migrations are never re-run).
+
 ## Next
 - [ ] Decide whether `/shared/[token]` links should be gated for a lapsed school.
 - [ ] Gate at the database level (RLS) if direct-Supabase access by students becomes a concern.
 - [ ] Optional: grace period and a vendor-side view of every school's expiry date.
-
+- [ ] Platform dashboard: durable audit log (today it is stdout JSON lines only), edge rate limiting on `/login`, per-operator accounts instead of one shared password.
+- [ ] Platform API: add a nonce/replay store if the 5-minute replay window is a concern.
