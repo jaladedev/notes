@@ -11,9 +11,9 @@
 - [x] `0037_subscription_status_service_role.sql`: explicit service-role grant, kept out of 0036 because 0036 was already applied (applied migrations are never re-run).
 
 - [x] Grace period after a session ends: `0039_subscription_grace.sql` (`grace_days`, `grace` state, `subscription_status_at(date)`), admin warning during grace, `graceDays` on the platform API, optional grace arg on `set-subscription.sh`, SQL + unit tests.
+- [x] Decided: `/shared/[token]` links are **not** gated for a lapsed school; they keep working (access code and expiry still apply). README's "Limits" note already says so.
 
 ## Next
-- [ ] Decide whether `/shared/[token]` links should be gated for a lapsed school.
 - [ ] Gate at the database level (RLS) if direct-Supabase access by students becomes a concern.
 - [ ] Optional: a vendor-side view of every school's expiry date (the platform dashboard could show `grace_days` / `graceEndsOn` now).
 - [ ] Platform dashboard: durable audit log (today it is stdout JSON lines only), edge rate limiting on `/login`, per-operator accounts instead of one shared password.
