@@ -16,7 +16,8 @@
 - [x] Gate at the database level: `0040_subscription_rls_gate.sql` adds a restrictive `subscription_gate` RLS policy to every user-facing table (mirrors `isLockedOut()`; `profiles`, `settings`, `session_subscriptions` exempt), plus `apply_subscription_gate()` / `tables_missing_subscription_gate()`; `supabase/tests/10_subscription_rls.sql` (also fails on any ungated table). README "Limits" updated.
 
 ## Next
-- [ ] Close the remaining database-gate gaps: the five student-facing `SECURITY DEFINER` RPCs (`submit_quiz_attempt`, `get_quiz_attempt_questions`, `get_quiz_attempt_review`, `grade_essay_answer`, `parent_children`) bypass RLS, so a lapsed user can still call them directly. Fix: add a `subscription_allows_access()` check at the top of each. Also Storage object policies.
+- [x] Gate the five student-facing `SECURITY DEFINER` RPCs: `0042_gate_security_definer_rpcs.sql` adds a `subscription_allows_access()` check to `submit_quiz_attempt`, `get_quiz_attempt_questions`, `get_quiz_attempt_review`, `grade_essay_answer` and `parent_children`; `supabase/tests/11_subscription_rpc_gate.sql`.
+- [ ] Gate Supabase Storage object policies (the last database-gate gap).
 - [ ] Optional: a vendor-side view of every school's expiry date (the platform dashboard could show `grace_days` / `graceEndsOn` now).
 - [ ] Platform dashboard: durable audit log (today it is stdout JSON lines only), edge rate limiting on `/login`, per-operator accounts instead of one shared password.
 - [ ] Platform API: add a nonce/replay store if the 5-minute replay window is a concern.
