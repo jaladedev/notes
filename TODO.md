@@ -13,8 +13,11 @@
 - [x] Grace period after a session ends: `0039_subscription_grace.sql` (`grace_days`, `grace` state, `subscription_status_at(date)`), admin warning during grace, `graceDays` on the platform API, optional grace arg on `set-subscription.sh`, SQL + unit tests.
 - [x] Decided: `/shared/[token]` links are **not** gated for a lapsed school; they keep working (access code and expiry still apply). README's "Limits" note already says so.
 
+- [x] Gate at the database level: `0040_subscription_rls_gate.sql` adds a restrictive `subscription_gate` RLS policy to every user-facing table (mirrors `isLockedOut()`; `profiles`, `settings`, `session_subscriptions` exempt), plus `apply_subscription_gate()` / `tables_missing_subscription_gate()`; `supabase/tests/10_subscription_rls.sql` (also fails on any ungated table). README "Limits" updated.
+
 ## Next
-- [ ] Gate at the database level (RLS) if direct-Supabase access by students becomes a concern.
+- [ ] Close the remaining database-gate gaps: the five student-facing `SECURITY DEFINER` RPCs (`submit_quiz_attempt`, `get_quiz_attempt_questions`, `get_quiz_attempt_review`, `grade_essay_answer`, `parent_children`) bypass RLS, so a lapsed user can still call them directly. Fix: add a `subscription_allows_access()` check at the top of each. Also Storage object policies.
 - [ ] Optional: a vendor-side view of every school's expiry date (the platform dashboard could show `grace_days` / `graceEndsOn` now).
 - [ ] Platform dashboard: durable audit log (today it is stdout JSON lines only), edge rate limiting on `/login`, per-operator accounts instead of one shared password.
 - [ ] Platform API: add a nonce/replay store if the 5-minute replay window is a concern.
+t

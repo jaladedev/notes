@@ -144,10 +144,25 @@ paid session: an academic year label plus `starts_on`/`ends_on` dates.
   Removing the *last* row turns gating off again.
 - **Renewal warning:** admins see a banner on every dashboard page when 14 or
   fewer days remain, and throughout the grace period.
-- **Limits:** it is an app-level gate. Someone who calls Supabase directly with
-  a valid session isn't blocked, and public share links (`/shared/[token]`)
-  keep working. Each dashboard request makes one extra `subscription_status()`
-  call. A failed lookup lets the request through rather than locking the
+- **Database gate (0040):** the same rule is enforced by RLS, so calling
+  Supabase directly with a valid session no longer bypasses it. Every
+  user-facing table carries a restrictive `subscription_gate` policy that is
+  AND-ed with its existing policies and mirrors `isLockedOut()` (`expired` and
+  `upcoming` are closed; `off`, `active` and `grace` are open). `profiles`,
+  `settings` and `session_subscriptions` are exempt so the lockout flow still
+  works, and the service role (admin client, platform API) is unaffected.
+  **When you add a table**, run `select public.apply_subscription_gate();` in
+  its migration; `supabase/tests/10_subscription_rls.sql` fails if any
+  RLS-enabled table is left ungated.
+- **Limits:** the database gate does not cover `SECURITY DEFINER` functions,
+  which bypass RLS by design -- `submit_quiz_attempt`,
+  `get_quiz_attempt_questions`, `get_quiz_attempt_review`, `grade_essay_answer`
+  and `parent_children` -- nor Supabase Storage object policies. Each of those
+  only touches the caller's own attempt or children. Public share links
+  (`/shared/[token]`) keep working (they use the service role, and anon is
+  not gated). Each dashboard request makes one extra `subscription_status()`
+  call, and each gated statement one more (evaluated once per statement, not
+  per row). A failed lookup lets the request through rather than locking the
   school out.
 
 ## Central platform API (multi-school dashboard)
