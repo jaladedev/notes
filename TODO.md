@@ -20,4 +20,3 @@
 - [ ] Optional: a vendor-side view of every school's expiry date (the platform dashboard could show `grace_days` / `graceEndsOn` now).
 - [ ] Platform dashboard: durable audit log (today it is stdout JSON lines only), edge rate limiting on `/login`, per-operator accounts instead of one shared password.
 - [ ] Platform API: add a nonce/replay store if the 5-minute replay window is a concern.
-t
