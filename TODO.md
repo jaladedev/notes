@@ -18,6 +18,6 @@
 ## Next
 - [x] Gate the five student-facing `SECURITY DEFINER` RPCs: `0042_gate_security_definer_rpcs.sql` adds a `subscription_allows_access()` check to `submit_quiz_attempt`, `get_quiz_attempt_questions`, `get_quiz_attempt_review`, `grade_essay_answer` and `parent_children`; `supabase/tests/11_subscription_rpc_gate.sql`.
 - [x] Storage: no gap to close -- private bucket, no `storage.objects` policies, all access via the service-role client behind RLS-gated checks (README "Limits"). Only residue: already-issued signed URLs live up to 6 h.
-- [ ] Optional: a vendor-side view of every school's expiry date (the platform dashboard could show `grace_days` / `graceEndsOn` now).
-- [ ] Platform dashboard: durable audit log (today it is stdout JSON lines only), edge rate limiting on `/login`, per-operator accounts instead of one shared password.
+- [x] Vendor-side view of every school's expiry date: done in `notes_vend` (overview shows session end, last access day and days left, sorted soonest first).
+- [x] Platform dashboard hardening, done in `notes_vend`: durable append-only audit log (own Supabase project), shared login rate limiting, per-operator accounts (`OPERATORS_JSON`).
 - [x] Platform API replay guard: `0043_platform_replay_guard.sql` + `lib/platformRoute.ts` (each signature is single-use; fails open); `supabase/tests/12_platform_replay.sql`.
