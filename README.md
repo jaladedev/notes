@@ -154,11 +154,16 @@ paid session: an academic year label plus `starts_on`/`ends_on` dates.
   **When you add a table**, run `select public.apply_subscription_gate();` in
   its migration; `supabase/tests/10_subscription_rls.sql` fails if any
   RLS-enabled table is left ungated.
-- **Limits:** the database gate does not cover `SECURITY DEFINER` functions,
-  which bypass RLS by design -- `submit_quiz_attempt`,
-  `get_quiz_attempt_questions`, `get_quiz_attempt_review`, `grade_essay_answer`
-  and `parent_children` -- nor Supabase Storage object policies. Each of those
-  only touches the caller's own attempt or children. Public share links
+- **Limits:** the five `SECURITY DEFINER` functions that bypass RLS --
+  `submit_quiz_attempt`, `get_quiz_attempt_questions`,
+  `get_quiz_attempt_review`, `grade_essay_answer` and `parent_children` -- are
+  gated by `0042` (same `subscription_allows_access()` predicate). Supabase
+  Storage needs no policy: the `topic-resources` bucket is private, there are
+  no `storage.objects` policies (so signed-in users cannot touch objects
+  directly), and every upload/sign/delete goes through the service-role client
+  after an RLS-gated ownership check, so a lapsed user is already stopped
+  there. Signed URLs already issued stay valid for up to 6 hours.
+  Public share links
   (`/shared/[token]`) keep working (they use the service role, and anon is
   not gated). Each dashboard request makes one extra `subscription_status()`
   call, and each gated statement one more (evaluated once per statement, not
@@ -183,8 +188,12 @@ calls; nothing here knows about other schools.
 - **Auth is a request signature, not a login.** Each call carries
   `x-platform-timestamp` and `x-platform-signature` = HMAC-SHA256 over
   `timestamp.METHOD.path?query.body` (`lib/platformAuth.ts`). Requests more
-  than 5 minutes off are refused. A captured request can be replayed inside
-  that window; there is no nonce store.
+  than 5 minutes off are refused. Each accepted signature is recorded
+  (`platform_request_nonces`, migration `0043`) and works once, so a captured
+  request cannot be replayed. Two identical calls in the same second share a
+  signature and the second is refused. If the guard's lookup fails or `0043`
+  isn't applied yet, requests are allowed through rather than locking the
+  vendor out.
 - The dashboard never holds a school's database keys. Compromising it exposes
   only what these endpoints allow, plus each school's `PLATFORM_SECRET`.
 - Needs migrations `0036`, `0037` and `0039` (0037 makes the service role's

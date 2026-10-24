@@ -121,6 +121,10 @@ export type Database = {
         Args: Record<string, never>;
         Returns: { id: string; full_name: string }[];
       };
+      platform_claim_request: {
+        Args: { p_signature: string };
+        Returns: boolean;
+      };
       subscription_status: {
         Args: Record<string, never>;
         Returns: {

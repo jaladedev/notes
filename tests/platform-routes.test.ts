@@ -6,11 +6,13 @@ const SECRET = "k".repeat(40);
 
 // Records what the routes ask the database to do; no real Supabase.
 const calls: { table: string; op: string; args?: unknown }[] = [];
-const state = { deleteRows: [{ id: "x" }] as { id: string }[] };
+const state = { deleteRows: [{ id: "x" }] as { id: string }[], claim: true as boolean | null, claimError: null as string | null };
 
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
-    rpc: async () => ({
+    rpc: async (fn: string) => fn === "platform_claim_request"
+      ? { data: state.claimError ? null : state.claim, error: state.claimError ? { message: state.claimError } : null }
+      : ({
       data: [{ state: "active", academic_year: "2026/2027", starts_on: "2026-09-01", ends_on: "2027-07-31", days_left: 9 }],
       error: null,
     }),
@@ -48,7 +50,20 @@ function signed(method: string, path: string, body = "", secret = SECRET) {
 beforeEach(() => {
   calls.length = 0;
   state.deleteRows = [{ id: "x" }];
+  state.claim = true;
+  state.claimError = null;
   process.env.PLATFORM_SECRET = SECRET;
+});
+
+describe("platform API replay guard", () => {
+  it("rejects a signature that was already used", async () => {
+    state.claim = false;
+    expect((await statusGET(signed("GET", "/api/platform/status"))).status).toBe(401);
+  });
+  it("allows the request when the guard errors (e.g. 0043 not applied)", async () => {
+    state.claimError = "function platform_claim_request does not exist";
+    expect((await statusGET(signed("GET", "/api/platform/status"))).status).toBe(200);
+  });
 });
 
 describe("platform API auth", () => {

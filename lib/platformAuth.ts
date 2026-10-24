@@ -9,9 +9,11 @@
 // lib/sign.ts); tests/platform-auth.test.ts and its twin share one fixed
 // vector so the two cannot drift apart.
 //
-// Replay: a captured request is only reusable inside the timestamp window
-// (5 minutes). The endpoints are idempotent enough that this is acceptable;
-// it is not a nonce scheme.
+// Replay: the timestamp window (5 minutes) bounds how long a captured request
+// is usable; lib/platformRoute.ts then records each accepted signature
+// (platform_claim_request, migration 0043) so it works only ONCE. Identical
+// requests in the same second share a signature, so the second is refused --
+// callers should not fire the same call twice in one second.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
