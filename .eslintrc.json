@@ -7,7 +7,7 @@
         "paths": [
           {
             "name": "@/lib/supabase/admin",
-            "message": "createAdminClient bypasses RLS with the service_role key. Import it only from lib/actions/**, lib/audit.ts, app/api/**, or scripts — prefer createClient() from @/lib/supabase/server in anything else."
+            "message": "createAdminClient bypasses RLS with the service_role key. Import it only from lib/actions/**, lib/audit.ts, lib/platformRoute.ts, app/api/**, or scripts — prefer createClient() from @/lib/supabase/server in anything else."
           },
           {
             "name": "@supabase/supabase-js",
@@ -25,7 +25,7 @@
   },
   "overrides": [
     {
-      "files": ["lib/actions/**/*.ts", "lib/actions/**/*.tsx", "app/api/**/*.ts", "lib/audit.ts"],
+      "files": ["lib/actions/**/*.ts", "lib/actions/**/*.tsx", "app/api/**/*.ts", "lib/audit.ts", "lib/platformRoute.ts"],
       "rules": {
         "no-restricted-imports": [
           "error",
